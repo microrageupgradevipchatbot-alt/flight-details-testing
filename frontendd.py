@@ -109,10 +109,11 @@ def md_with_linebreaks(text: str) -> str:
 
 def call_agent(user_text: str) -> str:
     messages_to_send = []
-    
-
     messages_to_send.append({"role": "user", "content": user_text})
+    
     logger.info(f"📥 Messages sending to llm: {messages_to_send}")
+    logger.info(f"🔑 Session ID: {st.session_state.session_id}")
+    
     try:
         result = agent.invoke(
             {"messages": messages_to_send},
@@ -139,13 +140,14 @@ def call_agent(user_text: str) -> str:
 
         if not bot_reply_text:
             bot_reply_text = "Sorry, I am encountering some issues. Please try again later."
-        # Keep double newlines; do not collapse them
-        logger.info(f"✅ Agent invocation successful.{bot_reply_text}")
+            
+        logger.info(f"✅ Agent invocation successful. Reply: {bot_reply_text}")
         return bot_reply_text
+        
     except Exception as e:
-        logger.error(f"❌ Agent invocation failed: {e}")
-        return "Sorry, I am encountering some issues. Please try again later."
-
+        logger.error(f"❌ Agent invocation failed: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error type: {type(e).__name__}")
+        return f"Sorry, I encountered an error: {str(e)}. Please try again or contact support."
 # ---------- Chat history display ----------
 with st.container():
     for role, content in st.session_state.chat:

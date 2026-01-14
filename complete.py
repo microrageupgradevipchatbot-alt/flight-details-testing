@@ -273,19 +273,23 @@ def get_gemini_response(query,context,chat_history):
     return llm.invoke(prompt).content
 
 @tool
-def rag_query_tool(query,chat_history):
+def rag_query_tool(query: str, chat_history: List[Dict[str, str]]):
     """Retrieve relevant documents from vector store and generate a response using LLM."""
-    logger.info(f"🚪 Inside RAG query tool function")
-    
-    print("🚀 RAG pipeline started...")
-    print("Type 'exit' to quit.\n")
-    chromaDB = checking_vector_store()
-    context = get_context(query,chromaDB)
-    answer = get_gemini_response(query,context,chat_history)
-    
-    logger.info(f"🤖----> Assistant by rag is: {answer}\n")
-    return answer
-
+    try:
+        logger.info(f"🚪 Inside RAG query tool function")
+        logger.info(f"📝 Query: {query}")
+        logger.info(f"📜 Chat history: {chat_history}")
+        
+        print("🚀 RAG pipeline started...")
+        chromaDB = checking_vector_store()
+        context = get_context(query, chromaDB)
+        answer = get_gemini_response(query, context, chat_history)
+        
+        logger.info(f"🤖----> Assistant by rag is: {answer}\n")
+        return answer
+    except Exception as e:
+        logger.error(f"❌ RAG tool failed: {str(e)}", exc_info=True)
+        return f"I encountered an error while processing your request: {str(e)}"
 #===========================
 tools=[rag_query_tool]
 SYSTEM_PROMPT = """
@@ -444,16 +448,21 @@ STEP-13: After you have collected the user's email, immediately assemble ALL pre
 """
 
 #==================================== Create LangGraph Agent =========================================
-llm=get_gemini_llm()
-memory = InMemorySaver()
-
-agent = create_react_agent(
-    llm,
-    tools=tools,
-    checkpointer=memory,  # save convo in RAM
-    prompt=SYSTEM_PROMPT,
-)
-
+# At the bottom, replace the duplicate agent code with this:
+try:
+    llm = get_gemini_llm()
+    memory = InMemorySaver()
+    
+    agent = create_react_agent(
+        llm,
+        tools=tools,
+        checkpointer=memory,
+        prompt=SYSTEM_PROMPT,
+    )
+    logger.info("✅ Agent created successfully")
+except Exception as e:
+    logger.error(f"❌ Failed to create agent: {str(e)}", exc_info=True)
+    raise
 
 #================================================ LLM_AND_REACT_AGENT_Setup =========================================================================
 
