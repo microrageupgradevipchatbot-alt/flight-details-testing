@@ -34,7 +34,7 @@ from langgraph.prebuilt import create_react_agent
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
 def setup_paths():
-    current_dir = Path(__file__).parent.parent
+    current_dir = Path(__file__).parent
     data_dir = current_dir / "DATA"
     db_dir = data_dir / "DB"
     doc_dir = data_dir / "Docs"
