@@ -114,10 +114,10 @@ def call_agent(user_text: str) -> str:
         return bot_reply_text
     except ValueError as ve:
         logger.error(f"❌ Validation error: {ve}")
-        return "I need more information before I can help you. Let's start from the beginning - which service would you like to book: Airport VIP or Transfer?"
+        return f"I need more information before I can help you. Let's start from the beginning - which service would you like to book: Airport VIP or Transfer? -> {ve}"
     except Exception as e:
         logger.error(f"❌ Agent invocation failed: {e}")
-        return "Sorry, something went wrong. Please try again later."
+        return f"Sorry, something went wrong. Please try again later."
     
 # ---------- Chat history display ----------
 with st.container():
