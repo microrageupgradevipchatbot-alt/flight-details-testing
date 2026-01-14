@@ -1,0 +1,11 @@
+streamlit
+fastapi
+requests
+langchain
+langchain-chroma
+langchain-community
+google-generativeai
+langchain-google-genai
+langchain-text-splitters
+langchain-core
+pydantic
