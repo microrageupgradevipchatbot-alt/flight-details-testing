@@ -599,7 +599,7 @@ def send_email(to_email, subject, message):
     smtp_port = int(st.secrets["SMTP_PORT"])
     smtp_user = st.secrets["SMTP_USER"]
     smtp_pass = st.secrets["SMTP_PASS"]
-    
+
     msg = MIMEText(message,'html')
     msg["Subject"] = subject
     msg["From"] = smtp_user
@@ -708,22 +708,22 @@ def vip_services_tool(airport_id: str, travel_type: str, currency: str, service_
     """
     return get_vip_services(airport_id, travel_type, currency, service_id)
 @tool
-def format_vip_services_tool(vip_data, flight_data, travel_type, passenger_count, preferred_currency) -> str:
+def format_vip_services_tool(
+    vip_data: Optional[dict] = None,
+    flight_data: Optional[dict] = None,
+    travel_type: Optional[str] = None,
+    passenger_count: Optional[int] = None,
+    preferred_currency: Optional[str] = None,
+) -> str:
     """Format VIP services into a user-friendly message after calling vip_services_tool."""
-    if (
-        isinstance(vip_data, dict)
-        and "vip_services_tool_response" in vip_data
-        and isinstance(vip_data["vip_services_tool_response"], dict)
-    ):
+    # Defensive guards
+    if not all([vip_data, flight_data, travel_type, passenger_count, preferred_currency]):
+        return ("Missing information. Please call flight_details_tool and vip_services_tool first, "
+                "then provide travel type, passenger count, and currency.")
+    if isinstance(vip_data, dict) and "vip_services_tool_response" in vip_data:
         vip_data = vip_data["vip_services_tool_response"]
-    # Unwrap flight_data if needed (for consistency)
-    if (
-        isinstance(flight_data, dict)
-        and "flight_details_tool_response" in flight_data
-        and isinstance(flight_data["flight_details_tool_response"], dict)
-    ):
+    if isinstance(flight_data, dict) and "flight_details_tool_response" in flight_data:
         flight_data = flight_data["flight_details_tool_response"]
-
     return format_vip_services_message(vip_data, flight_data, travel_type, passenger_count, preferred_currency)
 
 #==============================================Transport tools=========================================================
@@ -741,20 +741,21 @@ def transport_services_tool(airport_id: str, currency: str) -> dict:
     return get_transport_services(airport_id, currency)
 
 @tool
-def format_transport_services_tool(transport_data, flight_data, passenger_count, preferred_currency, arrival_or_departure=None) -> str:
-    """Format transfer services into a user-friendly message after calling transport_services_tool"""
-    if (
-        isinstance(transport_data, dict)
-        and "transport_services_tool_response" in transport_data
-        and isinstance(transport_data["transport_services_tool_response"], dict)
-    ):
+def format_transport_services_tool(
+    transport_data: Optional[dict] = None,
+    flight_data: Optional[dict] = None,
+    passenger_count: Optional[int] = None,
+    preferred_currency: Optional[str] = None,
+    arrival_or_departure: Optional[str] = None,
+) -> str:
+    """Format transfer services into a user-friendly message after calling transport_services_tool."""
+    # Defensive guards
+    if not all([transport_data, flight_data, passenger_count, preferred_currency]):
+        return ("Missing information. Please call flight_details_tool and transport_services_tool first, "
+                "then provide passenger count and currency.")
+    if isinstance(transport_data, dict) and "transport_services_tool_response" in transport_data:
         transport_data = transport_data["transport_services_tool_response"]
-    # Unwrap flight_data if needed (for consistency)
-    if (
-        isinstance(flight_data, dict)
-        and "flight_details_tool_response" in flight_data
-        and isinstance(flight_data["flight_details_tool_response"], dict)
-    ):
+    if isinstance(flight_data, dict) and "flight_details_tool_response" in flight_data:
         flight_data = flight_data["flight_details_tool_response"]
     return format_transport_services_message(transport_data, flight_data, passenger_count, preferred_currency, arrival_or_departure)
 
