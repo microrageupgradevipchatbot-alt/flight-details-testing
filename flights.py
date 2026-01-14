@@ -17,7 +17,7 @@ from pydantic import BaseModel
 #RAG
 from langchain.tools import tool
 from langchain_chroma import Chroma
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import TextLoader,UnstructuredMarkdownLoader
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.messages import AIMessage, SystemMessage
@@ -33,7 +33,18 @@ from langgraph.prebuilt import create_react_agent
 
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
+def setup_paths():
+    current_dir = Path(__file__).parent.parent
+    data_dir = current_dir / "DATA"
+    db_dir = data_dir / "DB"
+    doc_dir = data_dir / "Docs"
+    
+    # Create directories if they don't exist
+    data_dir.mkdir(exist_ok=True)
+    db_dir.mkdir(exist_ok=True)
+    doc_dir.mkdir(exist_ok=True)
 
+    return current_dir, db_dir, doc_dir
 def setup_logging():
     CURRENT_DIR = Path(__file__).parent
     LOGS_DIR = CURRENT_DIR / 'Logs'
@@ -52,7 +63,7 @@ def setup_logging():
     logger.addHandler(console_handler)
     return logger
 
-
+CURRENT_DIR, DB_DIR, DOC_DIR = setup_paths()
 logger = setup_logging()
 
 if GOOGLE_API_KEY:
@@ -660,6 +671,228 @@ def format_airports_message(airports_data: dict) -> str:
     return "\n".join(f"{i+1}) {a['airport_name']}" for i, a in enumerate(airports_data["data"]))
 
 
+#==============================RAG functions===============
+def load_documents(folder_path):
+    documents = []
+    
+    # Check if folder exists and has files
+    if not os.path.exists(folder_path):
+        raise FileNotFoundError(f"⚠️ Documents folder does not exist: {folder_path}")
+    
+    files = os.listdir(folder_path)
+    if not files:
+        raise ValueError(f"⚠️ No files found in documents folder: {folder_path}")
+    
+    
+    for filename in files:
+        file_path = os.path.join(folder_path, filename)
+        print(f"full filename {file_path}")
+
+        if filename.endswith('.md'):
+            loader = UnstructuredMarkdownLoader(file_path)
+            print(f"loaded {filename}")
+        elif filename.endswith('.txt'):
+            loader = TextLoader(file_path)
+            print(f"loaded {filename}")
+        else:
+            print(f"unsupported file type : {filename}")
+            continue
+
+        documents.extend(loader.load())
+    
+    return documents
+
+def create_chunks(documents):
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=3500,
+        chunk_overlap=450
+        )
+    docs = text_splitter.split_documents(documents)
+    print(f"Created {len(docs)} chunks from {len(documents)} documents.")
+    return docs
+def create_chroma_db(text_chunks):
+  '''Index Documents (store embeddings) in vector store'''
+  embeddings = get_gemini_embeddings()
+  collection_name = "upgrade_collection"
+  print(f"✅Indexing {len(text_chunks)} chunks into Chroma vector store '{collection_name}'...")
+  chromaDB =  Chroma.from_documents(
+      collection_name=collection_name,
+      documents=text_chunks,
+      embedding=embeddings,
+      persist_directory=DB_DIR
+  )
+  print("✅Chroma vector store created successfully.")
+  return chromaDB
+
+def load_vector_store():
+    """Create the Chroma vector store if not present, else load it."""
+    embeddings = get_gemini_embeddings()
+    chromaDB = Chroma(
+        collection_name="upgrade_collection",
+        embedding_function=embeddings,
+        persist_directory=DB_DIR
+    )
+    print("✅Chroma vector store loaded from disk.")
+
+    return chromaDB
+def create_vector_store():
+    """Create the Chroma vector store if not present, else load it."""
+  
+    documents = load_documents(DOC_DIR)
+    text_chunks = create_chunks(documents)
+    chromaDB = create_chroma_db(text_chunks)
+
+    return chromaDB
+
+def checking_vector_store():
+    '''Check if vector store exists, if not create it'''
+    
+    if (DB_DIR / "chroma.sqlite3").exists():
+        print("✅ Existing vector store found. Loading it...")
+        chromaDB = load_vector_store()
+    else:
+        print("🛑 No existing vector store found. Creating a new one...")
+        chromaDB = create_vector_store()    
+
+    return chromaDB
+
+def retrieve_docs(query,chromaDB):
+  '''Retrieve Docs from Vector Store using similarity search'''
+  retrieveDocs = chromaDB.similarity_search(query,k=2)
+
+  return retrieveDocs
+def get_context_from_docs(documents):
+  '''Get pag_content from documents to create context'''
+
+  context = "\n\n".join([doc.page_content for doc in documents])
+  for i, doc in enumerate(documents):
+      logger.info(f"📋 Chunk {i+1}: {doc.page_content}")
+  return context
+
+def get_context(query,chromaDB):
+    retrieved_docs = retrieve_docs(query,chromaDB)
+    context= get_context_from_docs(retrieved_docs)
+    return context
+
+
+def build_prompt_v5(query, context, chat_history):
+    """
+    Elite conversational prompt with natural follow-ups and first-person engagement.
+    """
+    # Format last 4 exchanges as readable text
+    history_text = ""
+    if chat_history:
+        for turn in chat_history[-4:]:
+            history_text += f"User: {turn['user']}\nAssistant: {turn['assistant']}\n"
+
+    return f"""
+You are the UpgradeVIP Agent, assisting elite travelers with airport services.
+
+**Chat History:**
+{history_text}
+
+**User Question:**
+{query}
+
+**Context:**
+{context}
+
+---
+
+**CORE IDENTITY:**
+- Always use first-person ("I can help you", not "our chatbot can")
+- Tone: Warm, professional, refined vocabulary for elite clientele
+- Be intelligent, formal, understanding, and conversational
+- Add natural phrases ("Great question!", "Absolutely!", "I'd be delighted to help!" etc) to enhance user experience
+
+---
+
+**OUR SERVICES:**
+Always present our two core services in numbered format:
+1) Airport VIP
+2) Airport Transfers
+
+---
+
+**RESPONSE STRUCTURE:**
+
+1. **GREETINGS:**
+   - Mirror the user's greeting style (hi → hi, hello → hello, good morning → good morning)
+   - For enthusiastic greetings (hiiii, heyyyy), acknowledge enthusiasm but respond professionally
+   - For repeated greetings, handle gracefully (e.g., "Hi again!")
+   - **Standard Opening:**
+     "Welcome, I'm here to assist you with our two premium services:
+     1) Airport VIP
+     2) Airport Transfers
+     Which one would you like me to help you with today?"
+
+2. **CONCISENESS:**
+   - Match answer length to query specificity
+   - Email query → Email only
+   - Services query → Service names only (initially)
+   - Always follow with a contextual follow-up question
+
+3. **FOLLOW-UP QUESTIONS:**
+   - End responses with relevant follow-ups based on user's query/history
+   - Guide unmotivated users gently toward booking
+
+4. **VARIETY:**
+   - Never repeat previous answers verbatim
+   - Paraphrase responses even for identical queries
+
+---
+
+**CONTENT RULES:**
+- No metadata, internal labels, or formatting clutter from Context
+- Include links only when highly relevant or explicitly requested
+- Out-of-scope queries (e.g., "capital of London", "Elon Musk's salary"):
+  → "Apologies, that's outside my expertise. I'm here to assist with UpgradeVIP's airport services. How can I help you today?"
+
+---
+
+**GOAL:**
+Make chatting effortless and pleasant. Be relatable, helpful, polite, and professional while subtly guiding users toward booking our services.
+"""
+
+def get_gemini_embeddings():
+    #api_key = os.getenv("GOOGLE_API_KEY")
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="gemini-embedding-001",
+        google_api_key=GOOGLE_API_KEY
+    )
+    return embeddings
+def get_gemini_llm():
+    #api_key = os.getenv("GOOGLE_API_KEY")
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        google_api_key=GOOGLE_API_KEY,
+        temperature=0.7
+    )
+    return llm
+def get_gemini_response(query,context,chat_history):
+    #api_key = os.getenv("GOOGLE_API_KEY")
+    prompt = build_prompt_v5(query, context,chat_history)
+    llm = get_gemini_llm()
+    return llm.invoke(prompt).content
+
+
+#=========================rag tool ===========
+@tool
+def rag_query_tool(query: str, chat_history: Optional[List[Dict[str, str]]] = None) -> str:
+
+    """Retrieve relevant documents from vector store and generate a response using LLM."""
+    logger.info(f"🚪 Inside RAG query tool function")
+    
+    print("🚀 RAG pipeline started...")
+    print("Type 'exit' to quit.\n")
+    chromaDB = checking_vector_store()
+    context = get_context(query,chromaDB)
+    answer = get_gemini_response(query,context,chat_history)
+    
+    logger.info(f"🤖----> Assistant by rag is: {answer}\n")
+    return answer
+
+
 #==============================================flight tools=========================================================
 
 
@@ -884,7 +1117,9 @@ tools = [   flight_details_tool,
             airports_raw_tool,
 
             only_vip_services_tool,
-            only_transfer_services_tool
+            only_transfer_services_tool,
+
+            rag_query_tool
         ]
 
 #================================================ LLM_AND_REACT_AGENT_Setup =========================================================================
@@ -901,6 +1136,7 @@ llm = ChatGoogleGenerativeAI(
 
 memory = InMemorySaver()
 SYSTEM_PROMPT = """
+-> For out-of-scope questions or greetings or general queries etc which are not in this prompt call `rag_query_tool(query, chat_history)` where query: string containing the user's current message and chat_history[-4:]: list of the last 4 conversation turns, each as a dict with keys "user" and "assistant" For Example: [{"user": "Hello", "assistant": "Hi there!"}, {"user": "What services?", "assistant": "We offer..."}].
 
 **ROLE**:
 Booking only (Airport VIP or Transfers).
@@ -1002,10 +1238,10 @@ STEP-9:
        
 STEP-10: Ask for message for steward. 
 STEP-11: After that Then you have to ask for preferred time of meeting to the user.
-STEP-11a:         Only Ask for pickup address from user if 'primary_interested' is 'transfer' otherwise skip it.
+STEP-11a:         Only Ask for address from user if 'primary_interested' is 'transfer' otherwise skip it.
 STEP-12: After that Then you have to Ask for Email id of the user.
 STEP-13: After you have collected the user's email, immediately assemble ALL previously collected booking information into a dict called `extracted_info` and immediateky call `single_generate_invoice_tool(extracted_info)`. 
-         - show the invoice by trimming the html signs, ask user for confirmation.
+         - after generating the invoice, ask user for confirmation.
 - if user confirms then :
    - Use `send_email_tool(to_email, subject, message)` to send booking confirmations or invoices after user confirmation.
 - else if user does not confirm then :
