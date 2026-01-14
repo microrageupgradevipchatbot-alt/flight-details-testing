@@ -4,7 +4,7 @@ from langchain_core.messages import AIMessage
 from flights import agent, logger
 # ---------- Page config ----------
 st.set_page_config(
-    page_title="UpgradeVIP Flight Bot",
+    page_title="UpgradeVIP Chatbot",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -16,16 +16,19 @@ if "session_id" not in st.session_state:
 if "chat" not in st.session_state:
     st.session_state.chat = [
         ("assistant", 
-         "UpgradeVIP Flight Bot - Welcome!\n\n"
-         "Please provide your **flight number** (e.g., LY001) and **flight date** (MM/DD/YYYY format) to get started."
+         "Good day. Welcome to UpgradeVIP – where seamless luxury travel is our standard.\n"
+         "I'm here to ensure every detail of your journey is impeccably arranged.\n\n How may I be of service today?\n\n"
+         "**Airport VIP Services** – Fast-track security, lounge access, and meet & greet  \n"
+         "**Airport Transfer Services** – Chauffeur-driven transfers tailored to your schedule\n\n"
+         "What may I arrange to ensure a seamless journey?"
         )
     ]
 
 # ---------- Header ----------
 st.markdown("""
 <div class="main-header">
-  <h1>✈️ UpgradeVIP Flight Bot</h1>
-  <p>Get your flight details instantly.</p>
+  <h1>UpgradeVIP Chatbot</h1>
+  <p>Your premium concierge for Airport VIP and Transfers.</p>
 </div>
 """, unsafe_allow_html=True)
 st.write("")
@@ -39,9 +42,12 @@ with st.sidebar:
         if st.button("New chat"):
             st.session_state.chat = [
                 ("assistant", 
-                 "UpgradeVIP Flight Bot - Welcome!\n\n"
-                 "Please provide your **flight number** (e.g., LY001) and **flight date** (MM/DD/YYYY format) to get started."
-                )
+         "Good day. Welcome to UpgradeVIP – where seamless luxury travel is our standard.\n"
+         "I'm here to ensure every detail of your journey is impeccably arranged.\n\n How may I be of service today?\n\n"
+         "**Airport VIP Services** – Fast-track security, lounge access, and meet & greet  \n"
+         "**Airport Transfer Services** – Chauffeur-driven transfers tailored to your schedule\n\n"
+         "What may I arrange to ensure a seamless journey?"
+        )
             ]
             st.session_state.session_id = str(uuid.uuid4())
             st.rerun()
@@ -54,13 +60,29 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("#### Tips")
     st.info("""
-**How to use:**  
-1. Provide your **flight number** (e.g., LY001)
-2. Provide your **flight date** (MM/DD/YYYY format)
-3. The bot will fetch your flight details
-4. Choose between arrival or departure
+**Customer Assistance:**  
+Ask anything about UpgradeVIP – services, contact info, airport list, or general questions.
+- Note: Chatbot will not answer out of scope questions i.e capital of france etc
 
-*Example: "My flight is LY001 on 12/25/2025"*
+**Booking Flow:**  
+1. Tell the bot which service you want: **airport VIP** or **transfer**.  
+2. Provide your **flight number** (e.g. LY001) and **date** (MM/DD/YYYY).  
+3. Choose **Arrival/Departure**(choose departure)
+4. then select your **class** (Economy/Business/First).  
+5. Enter **passenger** and **luggage count** (range 1-10).  
+6. Pick your **preferred currency**.  
+7. Select a service card by entering card no. or title. 
+8. enter prefer time 
+9. enter msg for steward 
+10. give email.  
+11. For multi-service, the bot will ask for other service you want to book.
+12 Yes or no 
+- if no
+    - then invoice will given by bot confirm it
+    - email will be send to you
+- if yes
+    - then repeat from step 1            
+*Tip: For airport list, just ask “Show airports list”.*
 """)
 
 # ---------- Helpers ----------
@@ -112,9 +134,6 @@ def call_agent(user_text: str) -> str:
         
         logger.info(f"✅ Bot reply: {bot_reply_text}")
         return bot_reply_text
-    except ValueError as ve:
-        logger.error(f"❌ Validation error: {ve}")
-        return f"I need more information before I can help you. Let's start from the beginning - which service would you like to book: Airport VIP or Transfer? -> {ve}"
     except Exception as e:
         logger.error(f"❌ Agent invocation failed: {e}")
         return f"Sorry, something went wrong. Please try again later."
