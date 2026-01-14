@@ -271,38 +271,39 @@ def get_gemini_response(query,context,chat_history):
     prompt = build_prompt_v5(query, context,chat_history)
     llm = get_gemini_llm()
     return llm.invoke(prompt).content
-from pydantic import BaseModel, Field
+# ...existing code...
+from typing import List, Dict, Optional
+from langchain_core.tools import tool
+from langchain.pydantic_v1 import BaseModel, Field
+# ...existing code...
 
-from typing import List, Dict
-
-# Define input schema properly
 class RagQueryInput(BaseModel):
-    """Input for RAG query tool."""
-    query: str = Field(description="The user's query string")
-    chat_history: List[Dict[str, str]] = Field(
+    """Input for the RAG query tool."""
+    query: str = Field(description="The user's query string.")
+    chat_history: Optional[List[Dict[str, str]]] = Field(
         default_factory=list,
-        description="List of previous conversation turns"
+        description="List of prior messages with keys like 'role' and 'content'."
     )
 
-@tool
-def rag_query_tool(query: str, chat_history: List[Dict[str, str]]):
+@tool(args_schema=RagQueryInput)
+def rag_query_tool(query: str, chat_history: Optional[List[Dict[str, str]]] = None) -> str:
     """Retrieve relevant documents from vector store and generate a response using LLM."""
     try:
-        logger.info(f"🚪 Inside RAG query tool function")
-        logger.info(f"📝 Query: {query}")
-        logger.info(f"📜 Chat history: {chat_history}")
-        
-        print("🚀 RAG pipeline started...")
+        ch = chat_history or []
+        logger.info("Inside rag_query_tool")
+        logger.info(f"Query: {query}")
+        logger.info(f"Chat history len: {len(ch)}")
+
         chromaDB = checking_vector_store()
         context = get_context(query, chromaDB)
-        answer = get_gemini_response(query, context, chat_history)
-        
-        logger.info(f"🤖----> Assistant by rag is: {answer}\n")
+        answer = get_gemini_response(query, context, ch)
+        logger.info(f"Assistant by rag: {answer}")
         return answer
     except Exception as e:
-        logger.error(f"❌ RAG tool failed: {str(e)}", exc_info=True)
+        logger.error(f"RAG tool failed: {str(e)}", exc_info=True)
         return f"I encountered an error while processing your request: {str(e)}"
-#===========================
+# ...existing code...
+# #===========================
 tools=[rag_query_tool]
 SYSTEM_PROMPT = """
 -> For out-of-scope questions or greetings or general queries etc which are not in this prompt call `rag_query_tool(query, chat_history)` where query: string containing the user's current message and chat_history[-4:]: list of the last 4 conversation turns, each as a dict with keys "user" and "assistant" For Example: [{"user": "Hello", "assistant": "Hi there!"}, {"user": "What services?", "assistant": "We offer..."}].
