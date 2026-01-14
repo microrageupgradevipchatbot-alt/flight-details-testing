@@ -6,3 +6,4 @@ langchain-community
 langgraph
 unstructured
 python-dotenv
+pydantic

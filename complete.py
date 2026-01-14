@@ -271,6 +271,18 @@ def get_gemini_response(query,context,chat_history):
     prompt = build_prompt_v5(query, context,chat_history)
     llm = get_gemini_llm()
     return llm.invoke(prompt).content
+from pydantic import BaseModel, Field
+
+from typing import List, Dict
+
+# Define input schema properly
+class RagQueryInput(BaseModel):
+    """Input for RAG query tool."""
+    query: str = Field(description="The user's query string")
+    chat_history: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="List of previous conversation turns"
+    )
 
 @tool
 def rag_query_tool(query: str, chat_history: List[Dict[str, str]]):
