@@ -28,7 +28,7 @@ from langgraph.prebuilt import create_react_agent
 
 # setup paths and logging
 def setup_paths():
-    current_dir = Path(__file__).parent.parent
+    current_dir = Path(__file__).parent
     data_dir = current_dir / "DATA"
     db_dir = data_dir / "DB"
     doc_dir = data_dir / "Docs"
