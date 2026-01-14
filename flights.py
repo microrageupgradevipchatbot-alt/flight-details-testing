@@ -595,11 +595,11 @@ def send_email(to_email, subject, message):
     logger.info(f"🚪 Inside send email function")
     
     # Replace with your SMTP server details
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
-    smtp_user = "hamzaaakm214@gmail.com"  # Replace with your Gmail address
-    smtp_pass = "bphr enas cxxu vkbv"     # Replace with your Gmail app password
-
+    smtp_server = st.secrets["SMTP_SERVER"]
+    smtp_port = int(st.secrets["SMTP_PORT"])
+    smtp_user = st.secrets["SMTP_USER"]
+    smtp_pass = st.secrets["SMTP_PASS"]
+    
     msg = MIMEText(message,'html')
     msg["Subject"] = subject
     msg["From"] = smtp_user
