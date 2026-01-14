@@ -1,9 +1,0 @@
-streamlit
-langchain
-langchain-google-genai
-langchain-chroma
-langchain-community
-langgraph
-unstructured
-python-dotenv
-pydantic
