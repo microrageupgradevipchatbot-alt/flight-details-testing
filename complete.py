@@ -276,20 +276,26 @@ from typing import List, Dict, Optional
 from langchain_core.tools import tool
 from langchain.pydantic_v1 import BaseModel, Field
 # ...existing code...
+class ChatTurn(BaseModel):
+    user: str = Field(..., description="User message for this turn.")
+    assistant: str = Field(..., description="Assistant reply for this turn.")
 
 class RagQueryInput(BaseModel):
     """Input for the RAG query tool."""
-    query: str = Field(description="The user's query string.")
-    chat_history: Optional[List[Dict[str, str]]] = Field(
+    query: str = Field(..., description="The user's query string.")
+    chat_history: List[ChatTurn] = Field(
         default_factory=list,
-        description="List of prior messages with keys like 'role' and 'content'."
+        description="Last conversation turns as objects with 'user' and 'assistant' keys."
     )
 
 @tool(args_schema=RagQueryInput)
-def rag_query_tool(query: str, chat_history: Optional[List[Dict[str, str]]] = None) -> str:
+def rag_query_tool(query: str, chat_history: Optional[List[ChatTurn]] = None) -> str:
     """Retrieve relevant documents from vector store and generate a response using LLM."""
     try:
-        ch = chat_history or []
+        ch_models = chat_history or []
+        # Convert ChatTurn models into dicts expected by build_prompt_v5
+        ch = [t.model_dump() for t in ch_models]
+
         logger.info("Inside rag_query_tool")
         logger.info(f"Query: {query}")
         logger.info(f"Chat history len: {len(ch)}")
@@ -302,7 +308,7 @@ def rag_query_tool(query: str, chat_history: Optional[List[Dict[str, str]]] = No
     except Exception as e:
         logger.error(f"RAG tool failed: {str(e)}", exc_info=True)
         return f"I encountered an error while processing your request: {str(e)}"
-# ...existing code...
+
 # #===========================
 tools=[rag_query_tool]
 SYSTEM_PROMPT = """
