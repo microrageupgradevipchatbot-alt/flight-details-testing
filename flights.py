@@ -6,7 +6,7 @@ import uuid
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
+#from dotenv import load_dotenv
 # Third-party
 import requests
 import streamlit as st
@@ -30,9 +30,10 @@ from langgraph.prebuilt import create_react_agent
 
 
 #============================================== .env  =========================================================
-
+#load_dotenv()
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
+#GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 def setup_paths():
     current_dir = Path(__file__).parent
     data_dir = current_dir / "DATA"
@@ -77,6 +78,12 @@ if not st.secrets.get("API_KEY"):
     logger.warning("API_KEY not found. Please set it in your environment or .env file.")  
 dev_url = st.secrets.get("DEV_URL")
 api_key = st.secrets.get("API_KEY")
+# if not os.getenv("DEV_URL"):  
+#     logger.warning("DEV_URL not found. Please set it in your environment or .env file.")
+# if not os.getenv("API_KEY"):  
+#     logger.warning("API_KEY not found. Please set it in your environment or .env file.")  
+# dev_url = os.getenv("DEV_URL")
+# api_key = os.getenv("API_KEY")
 #===============================================Flight Functions================================================================
 
 def get_flight_details_from_api(flight_number: str, flight_date: str) -> dict:
@@ -121,8 +128,7 @@ def get_flight_details_from_api(flight_number: str, flight_date: str) -> dict:
             logger.error(f"❌ Invalid JSON response from Production: {e}")
             return {"error": "Invalid JSON response", "message": "API returned invalid data format"}
     except Exception as e:
-        return {"error": "Request failed", "message": str(e)}  
-    
+        return {"error": "Request failed", "message": str(e)}    
 def format_flight_choice_message_impl(flight_data: dict) -> str:
     logger.info(f"🚪 Inside Formatting flight choice message function")
     if not flight_data or "data" not in flight_data or not flight_data["data"]:
@@ -200,7 +206,8 @@ def get_vip_services(airport_id: str, travel_type: str, currency: str, service_i
     except Exception as e:
         logger.error(f"❌ VIP services API request failed: {e}")
         return "Sorry VIP services API request failed"
-def format_vip_services_message(vip_data, flight_data, travel_type, passenger_count, preferred_currency):
+
+def format_vip_services_message(vip_data, passenger_count, preferred_currency):
     logger.info(f"🚪 Inside Formatting vip_services function")
     services = vip_data.get("data", []) if vip_data else []
     if not services:
@@ -246,8 +253,87 @@ def format_vip_services_message(vip_data, flight_data, travel_type, passenger_co
         
         msg += "\n" + "="*50 + "\n\n"
     logger.info(f"✈️ Formatted VIP services message: {msg}")
-    msg += "Please select a service by typing the number (e.g., '1', '2', etc.)"
     return msg
+
+#======================================invoice====================================
+def build_single_invoice_html(
+    title: str,
+    service_type: str,
+    service_name: str,
+    price: float,
+    currency: str,
+    email: str,
+    description: str,
+    refund_policy: str
+) -> str:
+    logger.info("🚪 Inside build_single_invoice_html")
+    currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
+    symbol = currency_symbols.get(currency, "$")
+    service_type_display = "Airport VIP" if service_type == "vip" else "Airport Transfer"
+    invoice = f"""
+    <h2><b>{title} - {service_type_display}</b></h2>
+    <br>
+    <b>Service:</b> {service_name}
+    <br><b>Price:</b> {symbol}{price} {currency}
+    <br><b>Email:</b> {email}
+    <br><b>Description:</b> {description}
+    <br><b>Refund Policy:</b> {refund_policy}
+    """
+    logger.info(f"🎫 Single Invoice Output:\n{invoice}")
+    return invoice
+
+def build_combined_invoice_html(
+    title: str,
+    primary_service_type: str,
+    primary_service_name: str,
+    primary_price: float,
+    primary_currency: str,
+    primary_description: str,
+    primary_refund_policy: str,
+    secondary_service_type: str,
+    secondary_service_name: str,
+    secondary_price: float,
+    secondary_currency: str,
+    secondary_description: str,
+    secondary_refund_policy: str,
+    email: str
+) -> str:
+    logger.info("🚪 Inside build_combined_invoice_html")
+    currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
+    primary_symbol = currency_symbols.get(primary_currency, "$")
+    secondary_symbol = currency_symbols.get(secondary_currency, "$")
+    primary_type_display = "Airport VIP" if primary_service_type == "vip" else "Airport Transfer"
+    secondary_type_display = "Airport VIP" if secondary_service_type == "vip" else "Airport Transfer"
+
+    if primary_currency == secondary_currency:
+        total = primary_price + secondary_price
+        total_line = f"<b>Total Price:</b> {primary_symbol}{total} {primary_currency}"
+    else:
+        total_line = (
+            f"<b>Total Price:</b><br>"
+            f"Primary: {primary_symbol}{primary_price} {primary_currency}<br>"
+            f"Secondary: {secondary_symbol}{secondary_price} {secondary_currency}"
+        )
+
+    invoice = f"""
+    <h2><b>{title} - Combined Booking</b></h2>
+    <br>
+    <b>Primary Service:</b> {primary_service_name} ({primary_type_display})<br>
+    <b>Price:</b> {primary_symbol}{primary_price} {primary_currency}<br>
+    <b>Description:</b> {primary_description}<br>
+    <b>Refund Policy:</b> {primary_refund_policy}
+    <hr>
+    <b>Secondary Service:</b> {secondary_service_name} ({secondary_type_display})<br>
+    <b>Price:</b> {secondary_symbol}{secondary_price} {secondary_currency}<br>
+    <b>Description:</b> {secondary_description}<br>
+    <b>Refund Policy:</b> {secondary_refund_policy}
+    <hr>
+    {total_line}
+    <br>
+    <b>Email:</b> {email}
+    """
+    logger.info(f"🎫 Combined Invoice Output:\n{invoice}")
+    return invoice
 
 #====================transfer service functions=======================
 
@@ -258,8 +344,7 @@ def get_transport_services(airport_id: str, currency: str) -> dict:
         return {"error": "Currency not specified", "message": "Please select a currency preference first."}
     
     logger.info(f"🚗 Calling Transport services API - airport_id={airport_id}, currency={currency}")
-    dev_url = os.getenv("DEV_URL")
-    api_key = os.getenv("API_KEY")
+    
 
     
     endpoint = f"{dev_url}get_vehicles?is_arrival=1&airport_id={airport_id}&currency={currency}"
@@ -299,32 +384,21 @@ def get_transport_services(airport_id: str, currency: str) -> dict:
     except Exception as e:
         logger.error(f"❌ Transport services API request failed: {e}")
         return "Sorry API request for vehicles failed "
-
-def format_transport_services_message(transport_data, flight_data, passenger_count, preferred_currency, arrival_or_departure=None):
+def format_transport_services_message(transport_data,  preferred_currency):
     logger.info(f"🚪 Inside Formatting transport services message function")
     vehicles = transport_data.get("data", []) if transport_data else []
     if not vehicles:
         return "Sorry, no transport services are available for your selected flight and requirements."
 
-    def _clean_vehicle_title(name_full: str) -> str:
-        s = (name_full or "Transport Service").strip()
-        # If has "(...)", keep up to and including ')'
-        if "(" in s and ")" in s and s.find("(") < s.find(")"):
-            return s[: s.find(")") + 1].strip()
-        # Else drop class/descriptors
-        for sep in [" - ", ", or similar", ", or", ", similar", ","]:
-            if sep in s:
-                return s.split(sep)[0].strip()
-        return s
-
+    
     currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
     symbol = currency_symbols.get(preferred_currency, "$")
 
     msg = "Available Transport Services:\n\n"
 
     for i, vehicle in enumerate(vehicles, 1):
-        name_full = vehicle.get("name", "Transport Service")
-        name = _clean_vehicle_title(name_full)
+        
+        name = vehicle.get("name", "Transport Service")
         price = vehicle.get("price", 0)
         msg += f"{i}. **Title:** {name}\n"
         msg += f"   **Price:** {symbol}{price}\n"
@@ -339,267 +413,8 @@ def format_transport_services_message(transport_data, flight_data, passenger_cou
             msg += "Not specified\n"
         msg += "\n" + "="*50 + "\n\n"
 
-    msg += "Please select a transport service by typing the number (e.g., '1', '2', etc.)"
     logger.info(f"🚗 Formatted transport services message: {msg}")
     return msg
-
-#=========================================== Invoice Generation Function ================================================================
-
-def generate_single_invoice(extracted_info):
-    logger.info(f"🚪 Inside single generate invoice function {extracted_info}")
-    
-
-    interest = extracted_info.get("primary_interested", "").strip().lower()
-
-    # --- Required fields ---
-    base_required_fields = [
-        "primary_flight_number", "primary_flight_date", "primary_flight_details",
-        "primary_service_selected", "primary_passenger_count",
-        "primary_preferred_time", "primary_msg_for_steward", "primary_email"
-    ]
-
-    if interest == "vip":
-        required_fields = base_required_fields + [
-            "primary_Arrival_or_departure", "primary_flight_class",
-            "primary_luggage_count", "primary_get_services"
-        ]
-    elif interest == "transfer":
-        required_fields = base_required_fields + [
-            "primary_airport_transfer_details", "primary_address"
-        ]
-    else:
-        logger.error(f"❌ Unknown primary service type '{interest}'")
-        return None
-
-    for field in required_fields:
-        if not extracted_info.get(field):
-            logger.error(f"❌ Missing required field '{field}' for service type '{interest}'")
-            return None
-
-    logger.info("✅ All required fields present for invoice generation")
-
-    # --- Flight info ---
-    
-# ...existing code...
-    flight_details = extracted_info.get("primary_flight_details", {}) or {}
-    # FIX: Unwrap if nested under 'flight_details_tool_response'
-    if isinstance(flight_details, dict) and "flight_details_tool_response" in flight_details:
-        flight_details = flight_details["flight_details_tool_response"]
-    flight_data = (flight_details.get("data") or [{}])[0]
-# ...existing code...
-
-
-    # --- Service list ---
-    
-
-    service_selected = extracted_info.get("primary_service_selected", "")
-    services_data = []
-    interest = extracted_info.get("primary_interested", "").strip().lower()
-    # ...existing code...
-    if interest == "vip":
-        vip_data = extracted_info.get("primary_get_services", {})
-        # Unwrap if nested under 'vip_services_tool_response'
-        if isinstance(vip_data, dict) and "vip_services_tool_response" in vip_data:
-            vip_data = vip_data["vip_services_tool_response"]
-        services_data = vip_data.get("data", [])
-        service_name_fallback = "Airport VIP Service"
-    else:
-        transfer_data = extracted_info.get("primary_airport_transfer_details", {})
-        # Unwrap if nested under 'transport_services_tool_response'
-        if isinstance(transfer_data, dict) and "transport_services_tool_response" in transfer_data:
-            transfer_data = transfer_data["transport_services_tool_response"]
-        services_data = transfer_data.get("data", [])
-        service_name_fallback = "Transport Service"
-    # ...existing code...
-
-    service_name, service_words, service_refund = service_name_fallback, "", "usually 48 hours"
-    selected_service = None
-
-    if isinstance(service_selected, dict):
-        selected_service = service_selected
-    elif str(service_selected).strip():
-        sel = str(service_selected).strip()
-        if sel.isdigit():
-            idx = int(sel) - 1
-            if 0 <= idx < len(services_data):
-                selected_service = services_data[idx]
-        else:
-            key = "title" if interest == "vip" else "name"
-            selected_service = next(
-                (s for s in services_data 
-                 if s.get(key) and s.get(key, "").lower() == sel.lower()), 
-                None
-            )
-    if selected_service:
-        if interest == "vip":
-            service_name = selected_service.get("title", service_name)
-        else:
-            service_name = selected_service.get("name", service_name)
-        service_words = selected_service.get("words", "")
-        service_refund = selected_service.get("refund_text", service_refund)
-
-    # --- Travel info ---
-    travel_type = extracted_info.get("primary_Arrival_or_departure", "").lower()
-    if interest == "vip":
-        if travel_type == "departure":
-            route_display, code, time, name = (
-                "Departure",
-                flight_data.get("origin_iata_code", ""),
-                f"{flight_data.get('origin_time', '')}",
-                flight_data.get("originName", ""),
-            )
-        else:  # arrival by default
-            route_display, code, time, name = (
-                "Arrival",
-                flight_data.get("destination_iata_code", ""),
-                f"{flight_data.get('destination_time', '')}",
-                flight_data.get("destinationName", ""),
-            )
-    elif interest == "transfer":
-        if travel_type == "departure":
-            route_display, code, time, name = (
-                "Departure",
-                flight_data.get("origin_iata_code", ""),
-                f"{flight_data.get('origin_time', '')}",
-                flight_data.get("originName", ""),
-            )
-        else:  # arrival by default
-            route_display, code, time, name = (
-                "Arrival",
-                flight_data.get("destination_iata_code", ""),
-                f"{flight_data.get('destination_time', '')}",
-                flight_data.get("destinationName", ""),
-            )
-    # --- Currency + price ---
-    currency = extracted_info.get("primary_preferred_currency")
-    symbol = "$" if currency == "USD" else "€" if currency == "EUR" else "£"
-    price = extracted_info.get("primary_price")
-
-    logger.info(f"💰 Service price: {symbol}{price} {currency}")
-
-    # --- Build invoice ---
-    if interest == "vip":
-        invoice = f"""<h2><b>BOOKING INVOICE - UpgradeVIP Services</b></h2>
-<br>
-<b>Flight Information:</b>
-- Flight: {extracted_info.get('primary_flight_number')} on {extracted_info.get('primary_flight_date')}
-- {route_display}:
-  {code}
-  {time}
-  {name}
-<br><b> Service Type:</b> {service_name}
-
-<br><b>Service Details:</b>
-- Adults: {extracted_info.get('primary_passenger_count')}
-- Luggage: {extracted_info.get('primary_luggage_count')} pieces
-- Meeting Time: {extracted_info.get('primary_preferred_time')}
-- Special Instructions: {extracted_info.get('primary_msg_for_steward')}
-
-<br><b>Payment Summary:</b>
-- Service Price: {symbol}{price} {currency}
-- Total Amount: {symbol}{price} {currency}
-
-<br><b>Contact Information:</b>
-- Email: {extracted_info.get('primary_email')}
-
-<br><b>Description:</b>
-- {service_words}
-
-<br><b>Important Notes:</b>
-- Service refund policy: {service_refund}
-- Please arrive 15 minutes before scheduled meeting time
-"""
-    else:  # transfer
-
-        invoice = f"""<h2><b>BOOKING INVOICE - UpgradeVIP Transport Services</b></h2>
-
-<b>Flight Information:</b>
-<br>- Flight: {extracted_info.get('primary_flight_number')} on {extracted_info.get('primary_flight_date')}
-- {route_display}:
-  {code}
-  {time}
-  {name}
-<br><b> Service Type:</b> {service_name}
-
-<br><b>Transport Details:</b>
-- Adults: {extracted_info.get('primary_passenger_count')}
-- Pickup/Drop-off Address: {extracted_info.get('primary_address')}
-- Pickup Time: {extracted_info.get('primary_preferred_time')}
-- Special Instructions: {extracted_info.get('primary_msg_for_steward')}
-
-<br><b>Payment Summary:</b>
-- Service Price: {symbol}{price} {currency}
-- Total Amount: {symbol}{price} {currency}
-
-<br><b>Contact Information:</b>
-- Email: {extracted_info.get('primary_email')}
-
-<br><b>Description:</b>
-- {service_words}
-
-"""
-
-    logger.info("🎉 Invoice generated successfully!")
-    logger.info(f"📄 Invoice preview: {invoice}...")
-    return invoice
-
-
-def generate_combined_invoice(extracted_info):
-   
-
-    logger.info("🧾 Starting combined invoice generation...")
-
-    # --- Generate primary invoice ---
-    invoice_primary = generate_single_invoice(extracted_info)
-
-    # --- Generate secondary invoice (only if exists) ---
-    invoice_secondary = None
-    if extracted_info.get("secondary_interested"):
-        # Temporarily map secondary_* fields into primary_* format
-        secondary_info = {
-            k.replace("secondary_", "primary_"): v
-            for k, v in extracted_info.items()
-            if k.startswith("secondary_")
-        }
-        invoice_secondary = generate_single_invoice(secondary_info)
-
-    # --- Prices & Currencies ---
-    price_1 = extracted_info.get("primary_price") 
-    currency_1 = extracted_info.get("primary_preferred_currency")
-
-    price_2 = extracted_info.get("secondary_price") 
-    currency_2 = extracted_info.get("secondary_preferred_currency")
-
-    # Currency symbols
-    def get_symbol(cur):
-        return "$" if cur == "USD" else "€" if cur == "EUR" else "£"
-
-    symbol_1 = get_symbol(currency_1)
-    symbol_2 = get_symbol(currency_2)
-
-    # --- Total logic ---
-    if invoice_secondary:
-        if currency_1 == currency_2:
-            total = price_1 + price_2
-            total_line = f"<b>TOTAL FOR BOTH SERVICES:</b> {get_symbol(currency_1)}{total} {currency_1}"
-        else:
-            total_line = (
-                f"<b>Service 1:</b> {symbol_1}{price_1} {currency_1}\n"
-                f"<b>Service 2:</b> {symbol_2}{price_2} {currency_2}"
-            )
-
-        combined_invoice = (
-            f"{invoice_primary}\n\n--- SECONDARY BOOKING ---\n\n"
-            f"{invoice_secondary}\n\n"
-            f"{total_line}\n"
-            
-        )
-    else:
-        combined_invoice = invoice_primary
-
-    logger.info("🎉 Combined invoice generated successfully!")
-    return combined_invoice
-
 
 #================================== Email Function ==============================
 def send_email(to_email, subject, message):
@@ -610,7 +425,10 @@ def send_email(to_email, subject, message):
     smtp_port = int(st.secrets["SMTP_PORT"])
     smtp_user = st.secrets["SMTP_USER"]
     smtp_pass = st.secrets["SMTP_PASS"]
-
+    # smtp_server = os.getenv("SMTP_SERVER")
+    # smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    # smtp_user = os.getenv("SMTP_USER")
+    # smtp_pass = os.getenv("SMTP_PASS")
     msg = MIMEText(message,'html')
     msg["Subject"] = subject
     msg["From"] = smtp_user
@@ -625,7 +443,7 @@ def send_email(to_email, subject, message):
         logger.info(f"✔️🎊Email sent successfully!")
         return True
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        logger.error(f"Failed to send email: {e}")
         return False
 
 #=============================airports list function===========================
@@ -686,16 +504,16 @@ def load_documents(folder_path):
     
     for filename in files:
         file_path = os.path.join(folder_path, filename)
-        print(f"full filename {file_path}")
+        logger.info(f"full filename {file_path}")
 
         if filename.endswith('.md'):
             loader = UnstructuredMarkdownLoader(file_path)
-            print(f"loaded {filename}")
+            logger.info(f"loaded {filename}")
         elif filename.endswith('.txt'):
             loader = TextLoader(file_path)
-            print(f"loaded {filename}")
+            logger.info(f"loaded {filename}")
         else:
-            print(f"unsupported file type : {filename}")
+            logger.warning(f"unsupported file type : {filename}")
             continue
 
         documents.extend(loader.load())
@@ -708,20 +526,20 @@ def create_chunks(documents):
         chunk_overlap=450
         )
     docs = text_splitter.split_documents(documents)
-    print(f"Created {len(docs)} chunks from {len(documents)} documents.")
+    logger.info(f"Created {len(docs)} chunks from {len(documents)} documents.")
     return docs
 def create_chroma_db(text_chunks):
   '''Index Documents (store embeddings) in vector store'''
   embeddings = get_gemini_embeddings()
   collection_name = "upgrade_collection"
-  print(f"✅Indexing {len(text_chunks)} chunks into Chroma vector store '{collection_name}'...")
+  logger.info(f"✅Indexing {len(text_chunks)} chunks into Chroma vector store '{collection_name}'...")
   chromaDB =  Chroma.from_documents(
       collection_name=collection_name,
       documents=text_chunks,
       embedding=embeddings,
       persist_directory=DB_DIR
   )
-  print("✅Chroma vector store created successfully.")
+  logger.info("✅Chroma vector store created successfully.")
   return chromaDB
 
 def load_vector_store():
@@ -732,7 +550,7 @@ def load_vector_store():
         embedding_function=embeddings,
         persist_directory=DB_DIR
     )
-    print("✅Chroma vector store loaded from disk.")
+    logger.info("✅Chroma vector store loaded from disk.")
 
     return chromaDB
 def create_vector_store():
@@ -748,10 +566,10 @@ def checking_vector_store():
     '''Check if vector store exists, if not create it'''
     
     if (DB_DIR / "chroma.sqlite3").exists():
-        print("✅ Existing vector store found. Loading it...")
+        logger.info("✅ Existing vector store found. Loading it...")
         chromaDB = load_vector_store()
     else:
-        print("🛑 No existing vector store found. Creating a new one...")
+        logger.info("🛑 No existing vector store found. Creating a new one...")
         chromaDB = create_vector_store()    
 
     return chromaDB
@@ -892,6 +710,66 @@ def rag_query_tool(query: str, chat_history: Optional[List[Dict[str, str]]] = No
     logger.info(f"🤖----> Assistant by rag is: {answer}\n")
     return answer
 
+#=============================invoice tools========================
+
+@tool
+def build_single_invoice_html_tool(
+    title: str,
+    service_type: str,
+    service_name: str,
+    price: float,
+    currency: str,
+    email: str,
+    description: str,
+    refund_policy: str
+) -> str:
+    """
+    Generate a single-service HTML invoice.
+    Parameters match SINGLE_INVOICE_SCHEMA.
+    """
+    return build_single_invoice_html(
+        title, service_type, service_name, price, currency, email, description, refund_policy
+    )
+
+@tool
+def build_combined_invoice_html_tool(
+    title: str,
+    primary_service_type: str,
+    primary_service_name: str,
+    primary_price: float,
+    primary_currency: str,
+    primary_description: str,
+    primary_refund_policy: str,
+    secondary_service_type: str,
+    secondary_service_name: str,
+    secondary_price: float,
+    secondary_currency: str,
+    secondary_description: str,
+    secondary_refund_policy: str,
+    email: str
+) -> str:
+    """
+    Generate a combined-services HTML invoice.
+    Parameters match COMBINED_INVOICE_SCHEMA.
+    """
+    return build_combined_invoice_html(
+        title,
+        primary_service_type,
+        primary_service_name,
+        primary_price,
+        primary_currency,
+        primary_description,
+        primary_refund_policy,
+        secondary_service_type,
+        secondary_service_name,
+        secondary_price,
+        secondary_currency,
+        secondary_description,
+        secondary_refund_policy,
+        email
+    )
+
+
 
 #==============================================flight tools=========================================================
 
@@ -908,7 +786,6 @@ def flight_details_tool(flight_number: str, flight_date: str):
     Call this tool as soon as both flight number and flight date are provided by the user.
     """
     return get_flight_details_from_api(flight_number, flight_date)
-
 @tool
 def format_flight_choice_tool(flight_data: dict) -> str:
     """Format flight details into a user-friendly message after calling flight_details_tool."""
@@ -943,21 +820,17 @@ def vip_services_tool(airport_id: str, travel_type: str, currency: str, service_
 @tool
 def format_vip_services_tool(
     vip_data: Optional[dict] = None,
-    flight_data: Optional[dict] = None,
-    travel_type: Optional[str] = None,
     passenger_count: Optional[int] = None,
-    preferred_currency: Optional[str] = None,
+    currency: Optional[str] = None,
 ) -> str:
     """Format VIP services into a user-friendly message after calling vip_services_tool."""
     # Defensive guards
-    if not all([vip_data, flight_data, travel_type, passenger_count, preferred_currency]):
-        return ("Missing information. Please call flight_details_tool and vip_services_tool first, "
-                "then provide travel type, passenger count, and currency.")
+    if not all([vip_data, passenger_count, currency]):
+        return ("Missing information. Please call vip_services_tool first, "
+                "then provide passenger count and currency.")
     if isinstance(vip_data, dict) and "vip_services_tool_response" in vip_data:
         vip_data = vip_data["vip_services_tool_response"]
-    if isinstance(flight_data, dict) and "flight_details_tool_response" in flight_data:
-        flight_data = flight_data["flight_details_tool_response"]
-    return format_vip_services_message(vip_data, flight_data, travel_type, passenger_count, preferred_currency)
+    return format_vip_services_message(vip_data, passenger_count, currency)
 
 #==============================================Transport tools=========================================================
 @tool
@@ -976,60 +849,17 @@ def transport_services_tool(airport_id: str, currency: str) -> dict:
 @tool
 def format_transport_services_tool(
     transport_data: Optional[dict] = None,
-    flight_data: Optional[dict] = None,
-    passenger_count: Optional[int] = None,
-    preferred_currency: Optional[str] = None,
-    arrival_or_departure: Optional[str] = None,
+    currency: Optional[str] = None,
 ) -> str:
     """Format transfer services into a user-friendly message after calling transport_services_tool."""
     # Defensive guards
-    if not all([transport_data, flight_data, passenger_count, preferred_currency]):
-        return ("Missing information. Please call flight_details_tool and transport_services_tool first, "
-                "then provide passenger count and currency.")
+    if not all([transport_data, currency]):
+        return ("Missing information. Please call transport_services_tool first, "
+                "then provide currency.")
     if isinstance(transport_data, dict) and "transport_services_tool_response" in transport_data:
         transport_data = transport_data["transport_services_tool_response"]
-    if isinstance(flight_data, dict) and "flight_details_tool_response" in flight_data:
-        flight_data = flight_data["flight_details_tool_response"]
-    return format_transport_services_message(transport_data, flight_data, passenger_count, preferred_currency, arrival_or_departure)
+    return format_transport_services_message(transport_data, currency)
 
-#========================================== Invoice Generation tool ===============================================================
-
-@tool
-def single_generate_invoice_tool(extracted_info: dict) -> str:
-    """Generate invoice for one service selected.
-
-    extracted_info must be a dict with keys exactly:
-    primary_interested(airport vip ->"vip" , airport transfer->"transfer"), primary_flight_number, primary_flight_date, primary_flight_details,
-    primary_service_selected, primary_passenger_count, primary_preferred_time,
-    primary_msg_for_steward, primary_email, primary_price, primary_preferred_currency,
-    primary_luggage_count, primary_flight_class, primary_Arrival_or_departure,
-    primary_get_services (for VIP) OR primary_airport_transfer_details and primary_address (for Transfer).
-     
-    """
-
-    logger.info(f"🔎Extracted info passed to invoice tool: {extracted_info}")
-    return generate_single_invoice(extracted_info)
-
-@tool
-def generate_combined_invoice_tool(extracted_info: dict) -> str:
-    """Generate combined invoice for both services selected.
-
-    extracted_info must be a dict with keys exactly:
-    primary_interested, primary_flight_number, primary_flight_date, primary_flight_details,
-    primary_service_selected, primary_passenger_count, primary_preferred_time,
-    primary_msg_for_steward, primary_email, primary_price, primary_preferred_currency,
-    primary_luggage_count, primary_flight_class, primary_Arrival_or_departure,
-    primary_get_services (for VIP) OR primary_airport_transfer_details and primary_address (for Transfer).
-    
-    secondary_interested, secondary_flight_number, secondary_flight_date, secondary_flight_details,
-    secondary_service_selected, secondary_passenger_count, secondary_preferred_time,
-    secondary_msg_for_steward, secondary_email, secondary_price, secondary_preferred_currency,
-    secondary_luggage_count, secondary_flight_class, secondary_Arrival_or_departure,
-    secondary_get_services (for VIP) OR secondary_airport_transfer_details and secondary_address (for Transfer).
-
-    """
-    logger.info(f"Extracted info passed to combined invoice tool: {extracted_info}")
-    return generate_combined_invoice(extracted_info)
 
 #========================================== Email Sending tool ===============================================================
 @tool
@@ -1078,25 +908,22 @@ def only_vip_services_tool(airport_id: str, travel_type: str, currency: str, pas
       str: Formatted VIP services message.
     """
     vip_data = get_vip_services(airport_id, travel_type, currency, service_id)
-    return format_vip_services_message(vip_data, flight_data, travel_type, passenger_count, currency)
+    return format_vip_services_message(vip_data, passenger_count, currency)
 
 @tool
-def only_transfer_services_tool(airport_id: str, currency: str, passenger_count: int, flight_data: dict = None, arrival_or_departure: str = None) -> str:
+def only_transfer_services_tool(airport_id: str, currency: str) -> str:
     """
     Fetch and format transfer services in one step.
 
     Parameters:
       airport_id (str): The airport ID.
       currency (str): User's preferred currency (USD, EUR, GBP).
-      passenger_count (int): Number of adults.
-      flight_data (dict, optional): Flight details object (can be None).
-      arrival_or_departure (str, optional): "Arrival" or "Departure" (default None).
 
     Returns:
       str: Formatted transfer services message.
     """
     transport_data = get_transport_services(airport_id, currency)
-    return format_transport_services_message(transport_data, flight_data, passenger_count, currency, arrival_or_departure)
+    return format_transport_services_message(transport_data, currency)
 
 #============================================== TOOLS_LIST =========================================================================
 tools = [   flight_details_tool,
@@ -1108,10 +935,10 @@ tools = [   flight_details_tool,
             transport_services_tool,
             format_transport_services_tool,
             
-            single_generate_invoice_tool,
-            generate_combined_invoice_tool,
-
+            
             send_email_tool,
+            build_single_invoice_html_tool,
+            build_combined_invoice_html_tool,
 
             airports_tool,
             airports_raw_tool,
@@ -1135,6 +962,7 @@ llm = ChatGoogleGenerativeAI(
 )
 
 memory = InMemorySaver()
+
 SYSTEM_PROMPT = """
 -> For out-of-scope questions or greetings or general queries etc which are not in this prompt call `rag_query_tool(query, chat_history)` where query: string containing the user's current message and chat_history[-4:]: list of the last 4 conversation turns, each as a dict with keys "user" and "assistant" For Example: [{"user": "Hello", "assistant": "Hi there!"}, {"user": "What services?", "assistant": "We offer..."}].
 
@@ -1143,9 +971,19 @@ Booking only (Airport VIP or Transfers).
 
 HARD GATE:
 - First capture `primary_interested` ∈ {"vip","transfer"}.
-- Do NOT ask for flight number, date, class, passengers, luggage, currency, or any other field until `primary_interested` is set.
-- If the user provides details out of sequence (e.g., flight number/date first), STORE them, acknowledge ("Noted."), then ask: "Which service would you like to book: Airport VIP or Transfer?"
-- After `primary_interested` is set, continue the BOOKING FLOW and SKIP questions for any details already provided (do not re-ask).
+- Recognize variations: "airport vip", "vip service", "vip lounge" → "vip" | "transfer", "transport", "car service" → "transfer" etc.
+- If user clearly states interest (e.g., "I want airport vip"), extract it immediately, acknowledge, and reply
+  "Would you like to book on our website or here in chat?
+   1) Website: https://order.upgradevip.com/
+   2) Chat: Continue here
+   Reply with 1 or 2."
+IF user replies "1" → provide website link and end conversation.
+Else:
+proceed to STEP-1 of BOOKING FLOW.
+- If user provides unrelated details first (flight number/date before stating service type), STORE them, acknowledge ("Noted."), then ask: "Which service: Airport VIP or Transfer?"
+- After `primary_interested` is set, SKIP questions for already-provided details (do not re-ask).
+
+
 
 'extracted_info' is a dict in which you will store all the information you collect from the user during the conversation these are the only entities you have store in extracted_info dict:
     "primary_interested":  "vip" or "transfer",
@@ -1188,16 +1026,23 @@ HARD GATE:
 
 NOTE: when its time to pass extracted_info to any tool always pass the full dict and make value NULL of those entities which you have not collected yet.    
 
-**MULTI SERVICE SELECTION**
-- if you are following 'BOOKING FLOW' 
-    - when you reach that step where you ask for email,first you should ask user if he wants to book airport transfer if 'primary_interested' is 'vip' else ask user if he wants to book airport vip service as well. 
-      - and extract user response and save it in 'primary_asked_second' as yes or no. 
-        if its yes:
-            than secondary_interested value will automatically be transfer if 'primary_interested' is vip else secondary_interested will become vip.
-            and start following 'BOOKING FLOW' from start and from now on extract user responses as secondary_* as it is given in the extracted_info dict above.
-            and the step where it ask for email we will copy that secondary_email value in primary_email and then we have top call combined_generate_invoice_tool(extracted_info) instead of single_generate_invoice_tool(extracted_info)
-            and have to copy secondary_confirmation value in primary_confirmation where it will ask for confirmation from the user in the flow
-        else: keep following 'BOOKING FLOW' from where you left it.
+**MULTI SERVICE SELECTION (STRICT)**
+- Ask for add-on service ONLY before (STEP-11) where you collect `primary_email` .
+- Then ask:
+  - If `primary_interested` == "vip": "Do you want to book airport transfer service as well? (yes/no)"
+  - Else: "Do you want to book airport VIP service as well? (yes/no)"
+- Save reply to `primary_asked_second` ("yes" or "no").
+
+IF `primary_asked_second` == "yes":
+- Set `secondary_interested` to the opposite service.
+- Follow BOOKING FLOW again for the secondary service and store answers as `secondary_*`.
+- IMPORTANT:
+  - Collect secondary STEP-1 → STEP-10a completely (do NOT skip preferred time or address).
+  - Do NOT generate any invoice until secondary required fields are collected.
+  - Set `secondary_email = primary_email` .
+
+IF `primary_asked_second` == "no":
+- Proceed to invoice (STEP-11).
 
         
 **BOOKING FLOW**
@@ -1207,45 +1052,83 @@ STEP-2: ask for date (show example: 10/31/25, in MM/DD/YYYY format).
 STEP-3: After having primary_interested, primary_flight_number,primary_flight_date, IMMEDIATELY call `flight_details_tool(primary_flight_number, primary_flight_date)` to fetch flight details.
         - Present the flight details to the user using `format_flight_choice_tool`.
 STEP-4: Then ask user for travel type (Arrival or Departure).
-STEP-5: Then ask for flight class (Economy/plus, Business, First).
-STEP-6: Then ask user for number of adults (also showing user : children above 2 also included ; range is 1-10).
-STEP-7: Then ask for and luggage (range is 1-10).
-STEP-8: Then ask user for preferred currency (USD, EUR, GBP).
-STEP-9: 
-        IF primary_interested is 'transfer' :
-              Firstly Use `transport_services_tool(airport_id, currency)` to fetch available transport services after collecting primary_flight_details, primary_Arrival_or_departure, primary_passenger_count, primary_luggage_count and primary_preferred_currency.
-                - For Departure, use `origin_airport`; for Arrival, use `destination_airport` from the primary_flight_details as airport_id.
-              And After this Immediately use `format_transport_services_tool(transport_data, flight_data, passenger_count, preferred_currency, arrival_or_departure)` and show exact output to user .
-                - When calling format_transport_services_tool, always pass:
-                - transport_data: the exact dict returned by transport_services_tool (no extra nesting)
-                - flight_data: the dict returned by flight_details_tool
-                - passenger_count: as provided by the user primary_passenger_count
-                - preferred_currency: as provided by the user primary_preferred_currency
-                - arrival_or_departure: as provided by the user primary_Arrival_or_departure
-              Right After that present transport options to user and ask user to select any service card by name or by number.  
+STEP-5: Then ask user for number of adults (also showing user : children above 2 also included ; range is 1-10).
+STEP-6: Then ask for and luggage (range is 1-10).
+STEP-7: Then ask user for preferred currency (USD, EUR, GBP).
+STEP-8: Fetch and display services:
+        IF primary_interested is 'transfer':
+              Call `only_transfer_services_tool(airport_id, currency)`:
+                 - airport_id: `origin_airport` (Departure) or `destination_airport` (Arrival) from primary_flight_details
+                 - currency: primary_preferred_currency
+              Display output → Ask: "Please select a service by name or number i.e 1,2 etc."
+              If tool returns "Sorry, no transport services are available...":**
+                 - Display the exact message to user
+                
+        ELSE IF primary_interested is 'vip':
+              Call `only_vip_services_tool(airport_id, travel_type, currency, passenger_count)`:
+                 - airport_id: `origin_airport` (Departure) or `destination_airport` (Arrival) from primary_flight_details
+                 - travel_type: primary_Arrival_or_departure
+                 - currency: primary_preferred_currency
+                 - passenger_count: primary_passenger_count
+              Display output → Ask: "Please select a service by name or number i.e 1,2 etc."
+              If tool returns "Sorry, no VIP services are available...":**
+                 - Display the exact message to user
+                
+STEP-9: Ask for message for steward. 
+STEP-10: After that Then you have to ask for preferred time of meeting to the user.
+STEP-10a:  Only Ask for address from user if 'primary_interested' is 'transfer' otherwise skip it.
+STEP-11: After that Then you have to Ask for Email id of the user.
+STEP-11b (ADD-ON CHECK):
+- After STEP-11, run MULTI SERVICE SELECTION (STRICT).
+STEP-12: After you have collected the user's email:
+1) Immediately assemble ALL previously collected booking info into a dict called `extracted_info` (include ALL required keys; set missing to null).
+2) Create invoice schema(s) (mapping-only; do NOT invent values):
 
-        ELSE IF primary_interested is 'vip' :
-              Firstly Use `vip_services_tool(airport_id, travel_type, currency, service_id)` after collecting primary_flight_details, primary_Arrival_or_departure, primary_flight_class, ptimary_passenger_count, primary_luggage_count, and primary_preferred_currency to fetch available VIP services.
-                - For Departure, use `origin_airport`; for Arrival, use `destination_airport` from the primary_flight_details as airport_id.
-              And After this Immediately call `format_vip_services_tool(vip_data, flight_data, travel_type, passenger_count, preferred_currency)` and show exact output to user .
-                - When calling format_vip_services_tool, always pass:
-                - vip_data: the exact dict returned by vip_services_tool (no extra nesting)
-                - flight_data: the dict returned by flight_details_tool
-                - travel_type: as provided by the user primary_Arrival_or_departure
-                - passenger_count: as provided by the user primary_passenger_count
-                - preferred_currency: as provided by the user primary_preferred_currency
-               Right After that present VIP service options to user and ask user to select any service card by name or by number.  
-       
-STEP-10: Ask for message for steward. 
-STEP-11: After that Then you have to ask for preferred time of meeting to the user.
-STEP-11a:         Only Ask for address from user if 'primary_interested' is 'transfer' otherwise skip it.
-STEP-12: After that Then you have to Ask for Email id of the user.
-STEP-13: After you have collected the user's email, immediately assemble ALL previously collected booking information into a dict called `extracted_info` and immediateky call `single_generate_invoice_tool(extracted_info)`. 
-         - after generating the invoice, ask user for confirmation.
-- if user confirms then :
-   - Use `send_email_tool(to_email, subject, message)` to send booking confirmations or invoices after user confirmation.
-- else if user does not confirm then :
-   - politely ask user what changes he want to make in the booking and restart the flow from there.
+SINGLE_INVOICE_SCHEMA = {
+  "title": "UpgradeVIP",
+  "service_type": "primary_interested",
+  "service_name": "primary_service_selected (matched title/name)",
+  "price": "primary_price",
+  "currency": "primary_preferred_currency",
+  "email": "primary_email",
+  "description": "matched service words/description",
+  "refund_policy": "matched service refund_text/refund policy"
+}
+
+COMBINED_INVOICE_SCHEMA = {
+  "title": "UpgradeVIP",
+  "primary_service": {
+    "service_type": "primary_interested",
+    "service_name": "primary_service_selected (matched title/name)",
+    "price": "primary_price",
+    "currency": "primary_preferred_currency",
+    "description": "primary matched service words/description",
+    "refund_policy": "primary matched service refund_text/refund policy"
+  },
+  "secondary_service": {
+    "service_type": "secondary_interested",
+    "service_name": "secondary_service_selected (matched title/name)",
+    "price": "secondary_price",
+    "currency": "secondary_preferred_currency",
+    "description": "secondary matched service words/description",
+    "refund_policy": "secondary matched service refund_text/refund policy"
+  },
+  "email": "primary_email",
+  "total_price": "primary_price + secondary_price (ONLY if same currency; otherwise show both separately)",
+  
+}
+
+ IF 'primary_interested' is set but secondary_interested is NOT set
+    - call 'build_single_invoice_html_tool' with 'SINGLE_INVOICE_SCHEMA'.
+    - display invoice to user.
+ Else
+    - call 'build_combined_invoice_html_tool' with 'COMBINED_INVOICE_SCHEMA'.
+    - display invoice to user.
+
+3) Ask confirmation: "Please confirm (yes/no)."
+- If YES: call `send_email_tool(primary_email, "UpgradeVIP Booking Invoice", invoice)`
+- If NO: ask what to change and resume from that step.
+
 
 
 **AIRPORTS LIST FLOW:**
@@ -1280,7 +1163,12 @@ STEP-13: After you have collected the user's email, immediately assemble ALL pre
   - Call `only_vip_services_tool(airport_id=airport_ID, travel_type=Travel_Type, currency="USD", passenger_count=1, flight_data=None, service_id=None)`
 - **If service_type is "transfer":**
   - Call `only_transfer_services_tool(airport_id=airport_ID, currency="USD", passenger_count=1, flight_data=None, arrival_or_departure=Travel_Type)`
-     
+
+**Step 5: Display Results Only**
+- Display the exact output from the tool (service cards with prices, descriptions, cancellation policies).
+- **DO NOT ask the user to select a service** in this flow.
+- **DO NOT add "Please select any service card by name or by number."**
+- Simply show the services
 
 **REMEMBER:**
 - When calling single_generate_invoice_tool or generate_combined_invoice_tool, always pass the full extracted_info dict with all required keys. For any value not collected, set it to null (None). Never omit required fields.
