@@ -6,7 +6,7 @@ import uuid
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-#from dotenv import load_dotenv
+from dotenv import load_dotenv
 # Third-party
 import requests
 import streamlit as st
@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 #RAG
 from langchain.tools import tool
-from langchain_chroma import Chroma
+from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import TextLoader,UnstructuredMarkdownLoader
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -30,10 +30,10 @@ from langgraph.prebuilt import create_react_agent
 
 
 #============================================== .env  =========================================================
-#load_dotenv()
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+# load_dotenv()
+#GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
-#GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 def setup_paths():
     current_dir = Path(__file__).parent
     data_dir = current_dir / "DATA"
@@ -167,7 +167,7 @@ def get_vip_services(airport_id: str, travel_type: str, currency: str, service_i
         response.raise_for_status()
         try:
             result = response.json()
-            logger.info("✅ Successfully connected to VIP services API (Production)")
+            logger.info(f"✅ Successfully connected to VIP services API (Production){result}")
             # Filter out unnecessary fields from each service card
             filtered_services = []
             for service in result.get("data", []):
@@ -528,57 +528,60 @@ def create_chunks(documents):
     docs = text_splitter.split_documents(documents)
     logger.info(f"Created {len(docs)} chunks from {len(documents)} documents.")
     return docs
-def create_chroma_db(text_chunks):
-  '''Index Documents (store embeddings) in vector store'''
-  embeddings = get_gemini_embeddings()
-  collection_name = "upgrade_collection"
-  logger.info(f"✅Indexing {len(text_chunks)} chunks into Chroma vector store '{collection_name}'...")
-  chromaDB =  Chroma.from_documents(
-      collection_name=collection_name,
-      documents=text_chunks,
-      embedding=embeddings,
-      persist_directory=DB_DIR
-  )
-  logger.info("✅Chroma vector store created successfully.")
-  return chromaDB
+def create_faiss_db(text_chunks):
+    '''Index Documents (store embeddings) in FAISS vector store'''
+    embeddings = get_gemini_embeddings()
+    logger.info(f"✅ Indexing {len(text_chunks)} chunks into FAISS vector store...")
+    faiss_db = FAISS.from_documents(
+        documents=text_chunks,
+        embedding=embeddings
+    )
+    # Save to disk
+    faiss_db.save_local(str(DB_DIR))
+    logger.info("✅ FAISS vector store created and saved successfully.")
+    return faiss_db
 
 def load_vector_store():
-    """Create the Chroma vector store if not present, else load it."""
-    embeddings = get_gemini_embeddings()
-    chromaDB = Chroma(
-        collection_name="upgrade_collection",
-        embedding_function=embeddings,
-        persist_directory=DB_DIR
-    )
-    logger.info("✅Chroma vector store loaded from disk.")
-
-    return chromaDB
+    """Load the FAISS vector store from disk."""
+    try:
+        embeddings = get_gemini_embeddings()
+        faiss_db = FAISS.load_local(
+            str(DB_DIR),
+            embeddings,
+            allow_dangerous_deserialization=True
+        )
+        logger.info("✅ FAISS vector store loaded from disk.")
+        return faiss_db
+    except Exception as e:
+        logger.error(f"❌ Failed to load vector store: {e}")
+        raise
 def create_vector_store():
     """Create the Chroma vector store if not present, else load it."""
   
     documents = load_documents(DOC_DIR)
     text_chunks = create_chunks(documents)
-    chromaDB = create_chroma_db(text_chunks)
+    faiss_db = create_faiss_db(text_chunks)
 
-    return chromaDB
+    return faiss_db
 
 def checking_vector_store():
     '''Check if vector store exists, if not create it'''
     
-    if (DB_DIR / "chroma.sqlite3").exists():
-        logger.info("✅ Existing vector store found. Loading it...")
-        chromaDB = load_vector_store()
+    # Check for FAISS index file
+    faiss_index_file = DB_DIR / "index.faiss"
+    if faiss_index_file.exists():
+        logger.info("✅ Existing FAISS vector store found. Loading it...")
+        faiss_db = load_vector_store()
     else:
         logger.info("🛑 No existing vector store found. Creating a new one...")
-        chromaDB = create_vector_store()    
+        faiss_db = create_vector_store()    
 
-    return chromaDB
+    return faiss_db
 
-def retrieve_docs(query,chromaDB):
-  '''Retrieve Docs from Vector Store using similarity search'''
-  retrieveDocs = chromaDB.similarity_search(query,k=2)
-
-  return retrieveDocs
+def retrieve_docs(query, faiss_db):
+    '''Retrieve Docs from Vector Store using similarity search'''
+    retrieveDocs = faiss_db.similarity_search(query, k=2)
+    return retrieveDocs
 def get_context_from_docs(documents):
   '''Get pag_content from documents to create context'''
 
@@ -587,8 +590,8 @@ def get_context_from_docs(documents):
       logger.info(f"📋 Chunk {i+1}: {doc.page_content}")
   return context
 
-def get_context(query,chromaDB):
-    retrieved_docs = retrieve_docs(query,chromaDB)
+def get_context(query, faiss_db):
+    retrieved_docs = retrieve_docs(query, faiss_db)
     context= get_context_from_docs(retrieved_docs)
     return context
 
@@ -984,7 +987,6 @@ proceed to STEP-1 of BOOKING FLOW.
 - After `primary_interested` is set, SKIP questions for already-provided details (do not re-ask).
 
 
-
 'extracted_info' is a dict in which you will store all the information you collect from the user during the conversation these are the only entities you have store in extracted_info dict:
     "primary_interested":  "vip" or "transfer",
     "primary_flight_number": ly001 or BA111 etc,
@@ -1027,15 +1029,15 @@ proceed to STEP-1 of BOOKING FLOW.
 NOTE: when its time to pass extracted_info to any tool always pass the full dict and make value NULL of those entities which you have not collected yet.    
 
 **MULTI SERVICE SELECTION (STRICT)**
-- Ask for add-on service ONLY before (STEP-11) where you collect `primary_email` .
-- Then ask:
+- Ask for add-on service .
+- ask:
   - If `primary_interested` == "vip": "Do you want to book airport transfer service as well? (yes/no)"
   - Else: "Do you want to book airport VIP service as well? (yes/no)"
 - Save reply to `primary_asked_second` ("yes" or "no").
 
 IF `primary_asked_second` == "yes":
 - Set `secondary_interested` to the opposite service.
-- Follow BOOKING FLOW again for the secondary service and store answers as `secondary_*`.
+- Follow **BOOKING FLOW** again for the secondary service and store answers as `secondary_*` in 'extracted_info'.
 - IMPORTANT:
   - Collect secondary STEP-1 → STEP-10a completely (do NOT skip preferred time or address).
   - Do NOT generate any invoice until secondary required fields are collected.
@@ -1079,7 +1081,7 @@ STEP-10: After that Then you have to ask for preferred time of meeting to the us
 STEP-10a:  Only Ask for address from user if 'primary_interested' is 'transfer' otherwise skip it.
 STEP-11: After that Then you have to Ask for Email id of the user.
 STEP-11b (ADD-ON CHECK):
-- After STEP-11, run MULTI SERVICE SELECTION (STRICT).
+- After STEP-11, run **MULTI SERVICE SELECTION (STRICT)**.
 STEP-12: After you have collected the user's email:
 1) Immediately assemble ALL previously collected booking info into a dict called `extracted_info` (include ALL required keys; set missing to null).
 2) Create invoice schema(s) (mapping-only; do NOT invent values):
@@ -1125,7 +1127,7 @@ COMBINED_INVOICE_SCHEMA = {
     - call 'build_combined_invoice_html_tool' with 'COMBINED_INVOICE_SCHEMA'.
     - display invoice to user.
 
-3) Ask confirmation: "Please confirm (yes/no)."
+3) Ask confirmation: skip a line then :"Please confirm (yes/no)."
 - If YES: call `send_email_tool(primary_email, "UpgradeVIP Booking Invoice", invoice)`
 - If NO: ask what to change and resume from that step.
 
