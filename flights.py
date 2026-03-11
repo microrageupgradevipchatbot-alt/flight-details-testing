@@ -10,8 +10,7 @@ from dotenv import load_dotenv
 # Third-party
 import requests
 import streamlit as st
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+
 from pydantic import BaseModel
 
 #RAG
@@ -30,7 +29,7 @@ from langgraph.prebuilt import create_react_agent
 
 
 #============================================== .env  =========================================================
-# load_dotenv()
+load_dotenv()
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
 # GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -67,7 +66,7 @@ def setup_logging():
 CURRENT_DIR, DB_DIR, DOC_DIR = setup_paths()
 logger = setup_logging()
 
-if GOOGLE_API_KEY:
+if  GOOGLE_API_KEY:
     logger.info("GOOGLE_API_KEY loaded successfully.")
 else:
     logger.info("GOOGLE_API_KEY not found. Please set it in your environment or .env file.")
@@ -225,7 +224,8 @@ def format_vip_services_message(vip_data, passenger_count, preferred_currency):
     currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
     symbol = currency_symbols.get(preferred_currency, "$")
     
-    msg = "Available VIP Services:\n\n"
+    msg = "✈️ **Available VIP Services:**\n\n"
+    
     for i, service in enumerate(services, 1):
         title = service.get("title", "VIP Service")
         price_key = f"adults_{passenger_count}"
@@ -233,28 +233,33 @@ def format_vip_services_message(vip_data, passenger_count, preferred_currency):
         refund_text = service.get("refund_text", "")
         words = service.get("words", "")
         
-        msg += f"{i}. Title: **{title}**\n"
-        msg += f"   PRICE: {symbol}{price}\n\n"
+        # Header with visual separator
+        msg += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += f"**{i}. {title}**\n"
+        msg += f"💰 **Price:** {symbol}{price} {preferred_currency}\n\n"
         
-        msg += "**Cancellations and modifications:**\n"
-        if refund_text:
-            msg += f"  {refund_text}\n\n"
-        else:
-            msg += "   Not specified\n\n"
-        
-        msg += "**Description:**\n"
+        # Description with bullets
+        msg += "📋 **Included Services:**\n"
         if words:
             details = [detail.strip() for detail in words.split(",")]
             for detail in details:
                 if detail:
-                    msg += f"  {detail}\n"
+                    msg += f"   • {detail}\n"
+        else:
+            msg += "   • Not specified\n"
+        msg += "\n"
+        
+        # Cancellation policy
+        msg += "🔄 **Cancellation Policy:**\n"
+        if refund_text:
+            msg += f"   {refund_text}\n"
         else:
             msg += "   Not specified\n"
         
-        msg += "\n" + "="*50 + "\n\n"
+        msg += "\n"
+    
     logger.info(f"✈️ Formatted VIP services message: {msg}")
     return msg
-
 #======================================invoice====================================
 def build_single_invoice_html(
     title: str,
@@ -264,32 +269,64 @@ def build_single_invoice_html(
     currency: str,
     email: str,
     description: str,
-    refund_policy: str
+    refund_policy: str,
+    flight_number: str = None,
+    flight_date: str = None,
+    passengers: int = None,
+    luggage: int = None,
+    meeting_time: str = None,
+    address: str = None
 ) -> str:
     logger.info("🚪 Inside build_single_invoice_html")
     currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
     symbol = currency_symbols.get(currency, "$")
     service_type_display = "Airport VIP" if service_type == "vip" else "Airport Transfer"
+    
     invoice = f"""
     <h2><b>{title} - {service_type_display}</b></h2>
     <br>
-    <b>Service:</b> {service_name}
-    <br><b>Price:</b> {symbol}{price} {currency}
-    <br><b>Email:</b> {email}
-    <br><b>Description:</b> {description}
-    <br><b>Refund Policy:</b> {refund_policy}
+    <h3>📋 Booking Details:</h3>
+    <b>Flight Number:</b> {flight_number}<br>
+    <b>Flight Date:</b> {flight_date}<br>
+    <b>Passengers:</b> {passengers}<br>
+    <b>Luggage:</b> {luggage}<br>
+    <b>Meeting Time:</b> {meeting_time}<br>
+    {f"<b>Address:</b> {address}<br>" if address else ""}
+    <br>
+    <hr>
+    <h3>🎫 Service Details:</h3>
+    <b>Service:</b> {service_name}<br>
+    <b>Price:</b> {symbol}{price} {currency}<br>
+    <b>Email:</b> {email}<br>
+    <b>Description:</b> {description}<br>
+    <b>Refund Policy:</b> {refund_policy}
     """
     logger.info(f"🎫 Single Invoice Output:\n{invoice}")
     return invoice
-
 def build_combined_invoice_html(
     title: str,
+    # Primary booking details
+    primary_flight_number: str,
+    primary_flight_date: str,
+    primary_passengers: int,
+    primary_luggage: int,
+    primary_meeting_time: str,
+    primary_address: str,
+    # Primary service
     primary_service_type: str,
     primary_service_name: str,
     primary_price: float,
     primary_currency: str,
     primary_description: str,
     primary_refund_policy: str,
+    # Secondary booking details
+    secondary_flight_number: str,
+    secondary_flight_date: str,
+    secondary_passengers: int,
+    secondary_luggage: int,
+    secondary_meeting_time: str,
+    secondary_address: str,
+    # Secondary service
     secondary_service_type: str,
     secondary_service_name: str,
     secondary_price: float,
@@ -318,23 +355,46 @@ def build_combined_invoice_html(
     invoice = f"""
     <h2><b>{title} - Combined Booking</b></h2>
     <br>
-    <b>Primary Service:</b> {primary_service_name} ({primary_type_display})<br>
+    
+    <h3>🎫 PRIMARY SERVICE</h3>
+    <h4>📋 Booking Details:</h4>
+    <b>Flight Number:</b> {primary_flight_number}<br>
+    <b>Flight Date:</b> {primary_flight_date}<br>
+    <b>Passengers:</b> {primary_passengers}<br>
+    <b>Luggage:</b> {primary_luggage}<br>
+    <b>Meeting Time:</b> {primary_meeting_time}<br>
+    {f"<b>Address:</b> {primary_address}<br>" if primary_address else ""}
+    
+    <h4>Service Details:</h4>
+    <b>Service:</b> {primary_service_name} ({primary_type_display})<br>
     <b>Price:</b> {primary_symbol}{primary_price} {primary_currency}<br>
     <b>Description:</b> {primary_description}<br>
     <b>Refund Policy:</b> {primary_refund_policy}
+    
     <hr>
-    <b>Secondary Service:</b> {secondary_service_name} ({secondary_type_display})<br>
+    
+    <h3>🎫 SECONDARY SERVICE</h3>
+    <h4>📋 Booking Details:</h4>
+    <b>Flight Number:</b> {secondary_flight_number}<br>
+    <b>Flight Date:</b> {secondary_flight_date}<br>
+    <b>Passengers:</b> {secondary_passengers}<br>
+    <b>Luggage:</b> {secondary_luggage}<br>
+    <b>Meeting Time:</b> {secondary_meeting_time}<br>
+    {f"<b>Address:</b> {secondary_address}<br>" if secondary_address else ""}
+    
+    <h4>Service Details:</h4>
+    <b>Service:</b> {secondary_service_name} ({secondary_type_display})<br>
     <b>Price:</b> {secondary_symbol}{secondary_price} {secondary_currency}<br>
     <b>Description:</b> {secondary_description}<br>
     <b>Refund Policy:</b> {secondary_refund_policy}
+    
     <hr>
     {total_line}
-    <br>
-    <b>Email:</b> {email}
+    <br><br>
+    <b>📧 Email:</b> {email}
     """
     logger.info(f"🎫 Combined Invoice Output:\n{invoice}")
     return invoice
-
 #====================transfer service functions=======================
 
 def get_transport_services(airport_id: str, currency: str) -> dict:
@@ -384,38 +444,43 @@ def get_transport_services(airport_id: str, currency: str) -> dict:
     except Exception as e:
         logger.error(f"❌ Transport services API request failed: {e}")
         return "Sorry API request for vehicles failed "
-def format_transport_services_message(transport_data,  preferred_currency):
+def format_transport_services_message(transport_data, preferred_currency):
     logger.info(f"🚪 Inside Formatting transport services message function")
     vehicles = transport_data.get("data", []) if transport_data else []
     if not vehicles:
         return "Sorry, no transport services are available for your selected flight and requirements."
-
     
     currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
     symbol = currency_symbols.get(preferred_currency, "$")
 
-    msg = "Available Transport Services:\n\n"
+    msg = "🚗 **Available Transport Services:**\n\n"
 
     for i, vehicle in enumerate(vehicles, 1):
-        
         name = vehicle.get("name", "Transport Service")
         price = vehicle.get("price", 0)
-        msg += f"{i}. **Title:** {name}\n"
-        msg += f"   **Price:** {symbol}{price}\n"
-        msg += f"**Description:**\n"
+        capacity = vehicle.get("capacity", "N/A")
         words = vehicle.get("words", "")
+        
+        # Header with visual separator
+        msg += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        msg += f"**{i}. {name}**\n"
+        msg += f"💰 **Price:** {symbol}{price} {preferred_currency}\n"
+        msg += f"👥 **Capacity:** {capacity} passengers\n\n"
+        
+        # Features with bullets
+        msg += "📋 **Features:**\n"
         if words:
             details = [detail.strip() for detail in words.split(",")]
             for detail in details:
                 if detail:
-                    msg += f"{detail}\n"
+                    msg += f"   • {detail}\n"
         else:
-            msg += "Not specified\n"
-        msg += "\n" + "="*50 + "\n\n"
+            msg += "   • Not specified\n"
+        
+        msg += "\n"
 
     logger.info(f"🚗 Formatted transport services message: {msg}")
     return msg
-
 #================================== Email Function ==============================
 def send_email(to_email, subject, message):
     logger.info(f"🚪 Inside send email function")
@@ -598,79 +663,97 @@ def get_context(query, faiss_db):
 
 def build_prompt_v5(query, context, chat_history):
     """
-    Elite conversational prompt with natural follow-ups and first-person engagement.
+    Neutral support prompt for concise, factual RAG answers.
     """
-    # Format last 4 exchanges as readable text
+    print("Building prompt v7...")
+    
     history_text = ""
     if chat_history:
         for turn in chat_history[-4:]:
             history_text += f"User: {turn['user']}\nAssistant: {turn['assistant']}\n"
 
     return f"""
-You are the UpgradeVIP Information Assistant.
+You are the UpgradeVIP support assistant.
 
-**Chat History:** {history_text}
-**User Question:** {query}
-**Context:** {context}
+**Chat History:**
+{history_text}
+
+**Current Query:**
+{query}
+
+**Context:**
+{context}
 
 ---
 
-**YOUR ROLE:**
-You provide information about UpgradeVIP's airport services. You cannot process bookings.
-- First-person voice, professional tone
-- For bookings: direct to avip@upgradevip.com or WhatsApp +44 7414 246103
+**ROLE:**
+- Answer in first person when needed, but keep the tone neutral and factual.
+- Act like a support assistant, not a concierge or salesperson.
+- Use short, clear sentences.
+- Prioritize accuracy from the provided context.
+
+---
+
+**GREETING RULES:**
+- Only greet if the user greets first or if this is the first interaction.
+- Keep greetings brief and neutral.
+- Do not use repeated greetings such as "Hello again", "Hi there", "Welcome back", or similar variations.
+- If the conversation is already underway, skip the greeting and answer directly.
 
 ---
 
 **RESPONSE RULES:**
 
-**1. GREETINGS:**
-- Mirror user's greeting professionally (acknowledge enthusiasm for casual greetings)
-- First greeting:
-starting line :"Welcome, I'm here to assist you with our two premium services:" 
-Middle part:
-1) Airport VIP 
-2) Airport Transfers 
-last line: "which one you want me to help you with today? "
-"
-- Repeated greetings: Vary naturally - examples:
-  * "Hello again! How can I help?"
-  * "Hi! What can I assist you with?"
-  * "Welcome back! What would you like to know?"
-  * "Good to see you again! How may I help?"
-- Never use the exact same response twice in a row
-- Never list services unless asked "What services do you offer?"
+1. Keep answers short and factual.
+   - Default to 1 to 3 sentences.
+   - For policy or FAQ questions, answer directly from context without extra promotion.
+   - For simple contact questions, provide only the requested detail.
 
-**2. ANSWER LENGTH:**
-- Answer ONLY what's asked - no extra details
-- Email query → provide email only
-- Service query → brief answer only
-- Keep answers under 3 sentences unless complex policy question
-- Default follow-up: "Anything else?"
+2. Keep the tone neutral.
+   - Do not use marketing language, luxury language, or sales phrasing.
+   - Do not exaggerate benefits.
+   - Do not persuade the user to book unless they explicitly ask about booking.
 
-**3. VARIETY:**
-- Never repeat verbatim
-- Paraphrase identical queries
+3. Avoid unnecessary closings.
+   - Do not add fillers such as "Anything else?", "Let me know if you need more", or similar closings unless a follow-up is required to answer correctly.
+   - Ask at most one follow-up question, and only when required to clarify missing information.
 
-**4. ESCALATION:**
-- Bookings/requests: "For booking assistance, contact: Email: avip@upgradevip.com, WhatsApp: +44 7414 246103"
+4. Use chat history carefully.
+   - If the user repeats a question, paraphrase the reply but keep the same facts.
+   - If the user changes topic, answer the new topic directly.
 
-**5. OUT-OF-SCOPE:**
-- "Apologies, that's outside my expertise. I'm here to provide information about UpgradeVIP's airport services. What can I help clarify?"
+5. Use the context as the source of truth.
+   - Extract only the actual answer from context.
+   - Do not expose metadata, section names, keyword lists, or internal formatting.
+   - Do not invent details that are not present in context.
 
 ---
 
-**CONTENT RULES:**
-- No metadata or formatting clutter from Context
-- Include links only when highly relevant
-- Never list services unprompted
-- Never repeat role description in responses
+**SPECIAL CASES:**
 
-**GOAL:** Provide clear, helpful information about UpgradeVIP services without sales language or promotional tone.
+**Out of scope:**
+"Sorry, I can only help with UpgradeVIP services and airport assistance information."
+
+**Pricing:**
+If pricing is present in context, provide it briefly.
+If pricing is not present, say: "Pricing depends on the airport and service requested."
+
+**Complaints:**
+For example : "I'm sorry about that. Please share the issue and I will help with the next step." etc
+
+---
+
+**NEVER:**
+- Use repeated or chatty greetings.
+- Add promotional wording.
+- Add unnecessary follow-up lines.
+- Use phrases like "As an AI".
+- Include context metadata in the final answer.
+
+**GOAL:**
+Provide concise, accurate, support-style answers grounded in the dataset.
 """
 
-
-    
 def get_gemini_embeddings():
     #api_key = os.getenv("GOOGLE_API_KEY")
     embeddings = GoogleGenerativeAIEmbeddings(
@@ -720,25 +803,47 @@ def build_single_invoice_html_tool(
     currency: str,
     email: str,
     description: str,
-    refund_policy: str
+    refund_policy: str,
+    flight_number: str = None,
+    flight_date: str = None,
+    passengers: int = None,
+    luggage: int = None,
+    meeting_time: str = None,
+    address: str = None
 ) -> str:
     """
     Generate a single-service HTML invoice.
     Parameters match SINGLE_INVOICE_SCHEMA.
     """
     return build_single_invoice_html(
-        title, service_type, service_name, price, currency, email, description, refund_policy
+        title, service_type, service_name, price, currency, email, description, refund_policy,
+        flight_number, flight_date, passengers, luggage, meeting_time, address
     )
-
 @tool
 def build_combined_invoice_html_tool(
     title: str,
+    # Primary booking details
+    primary_flight_number: str,
+    primary_flight_date: str,
+    primary_passengers: int,
+    primary_luggage: int,
+    primary_meeting_time: str,
+    primary_address: str,
+    # Primary service
     primary_service_type: str,
     primary_service_name: str,
     primary_price: float,
     primary_currency: str,
     primary_description: str,
     primary_refund_policy: str,
+    # Secondary booking details
+    secondary_flight_number: str,
+    secondary_flight_date: str,
+    secondary_passengers: int,
+    secondary_luggage: int,
+    secondary_meeting_time: str,
+    secondary_address: str,
+    # Secondary service
     secondary_service_type: str,
     secondary_service_name: str,
     secondary_price: float,
@@ -753,21 +858,16 @@ def build_combined_invoice_html_tool(
     """
     return build_combined_invoice_html(
         title,
-        primary_service_type,
-        primary_service_name,
-        primary_price,
-        primary_currency,
-        primary_description,
-        primary_refund_policy,
-        secondary_service_type,
-        secondary_service_name,
-        secondary_price,
-        secondary_currency,
-        secondary_description,
-        secondary_refund_policy,
+        primary_flight_number, primary_flight_date, primary_passengers,
+        primary_luggage, primary_meeting_time, primary_address,
+        primary_service_type, primary_service_name, primary_price,
+        primary_currency, primary_description, primary_refund_policy,
+        secondary_flight_number, secondary_flight_date, secondary_passengers,
+        secondary_luggage, secondary_meeting_time, secondary_address,
+        secondary_service_type, secondary_service_name, secondary_price,
+        secondary_currency, secondary_description, secondary_refund_policy,
         email
     )
-
 
 
 #==============================================flight tools=========================================================
@@ -939,7 +1039,7 @@ tools = [   flight_details_tool,
             build_single_invoice_html_tool,
             build_combined_invoice_html_tool,
 
-            airports_tool,
+            # airports_tool,
             airports_raw_tool,
 
             only_vip_services_tool,
@@ -969,18 +1069,16 @@ SYSTEM_PROMPT = """
 Booking only (Airport VIP or Transfers).
 
 HARD GATE:
-- First capture `primary_interested` ∈ {"vip","transfer"}.
-- Recognize variations: "airport vip", "vip service", "vip lounge" → "vip" | "transfer", "transport", "car service" → "transfer" etc.
-- If user clearly states interest (e.g., "I want airport vip"), extract it immediately, acknowledge, and reply
+- If user clearly states interest (e.g., "I want airport vip"), extract it immediately and store any other details provided (flight number, date, etc.) for later use.
+- **MANDATORY (NEVER SKIP):** Once `primary_interested` is captured, you MUST ALWAYS ask the website/chat question before anything else, even if the user provided flight number, date, or other details in the same message:
   "Would you like to book on our website or here in chat?
    1) Website: https://order.upgradevip.com/
    2) Chat: Continue here
    Reply with 1 or 2."
-IF user replies "1" → provide website link and end conversation.
-Else:
-proceed to STEP-1 of BOOKING FLOW.
-- If user provides unrelated details first (flight number/date before stating service type), STORE them, acknowledge ("Noted."), then ask: "Which service: Airport VIP or Transfer?"
-- After `primary_interested` is set, SKIP questions for already-provided details (do not re-ask).
+  IF user replies "1" → provide website link and end conversation.
+  IF user replies "2" → proceed to STEP-1 of BOOKING FLOW.
+- If user provides other details (flight number, date) before or alongside stating service type, STORE them silently and reuse them in the booking flow — do NOT re-ask for already-provided details.
+- The ONLY question that is NEVER skipped is the website/chat choice above.
 
 
 'extracted_info' is a dict in which you will store all the information you collect from the user during the conversation these are the only entities you have store in extracted_info dict:
@@ -1078,12 +1176,31 @@ STEP-10a:  Only Ask for address from user if 'primary_interested' is 'transfer' 
 STEP-11: After that Then you have to Ask for Email id of the user.
 STEP-11b (ADD-ON CHECK):
 - After STEP-11, run **MULTI SERVICE SELECTION (STRICT)**.
+
+STEP-11c (SUMMARY DISPLAY):
+- Before generating invoice, display a summary:
+  "Please review your booking:
+   Flight: [number] on [date]
+   Service: [primary_service_name]
+   Passengers: [count]
+   ... etc"
+- Ask: "Is this correct? (yes/no)"
+- If no, ask what to change
+- If yes, proceed to STEP-12
+
 STEP-12: After you have collected the user's email:
 1) Immediately assemble ALL previously collected booking info into a dict called `extracted_info` (include ALL required keys; set missing to null).
 2) Create invoice schema(s) (mapping-only; do NOT invent values):
 
 SINGLE_INVOICE_SCHEMA = {
   "title": "UpgradeVIP",
+  "booking_details": {
+    "flight_number": "primary_flight_number",
+    "flight_date": "primary_flight_date",
+    "passengers": "primary_passenger_count",
+    "luggage": "primary_luggage_count",
+    "meeting_time": "primary_preferred_time"
+  },
   "service_type": "primary_interested",
   "service_name": "primary_service_selected (matched title/name)",
   "price": "primary_price",
@@ -1095,6 +1212,14 @@ SINGLE_INVOICE_SCHEMA = {
 
 COMBINED_INVOICE_SCHEMA = {
   "title": "UpgradeVIP",
+  "primary_booking_details": {
+    "flight_number": "primary_flight_number",
+    "flight_date": "primary_flight_date",
+    "passengers": "primary_passenger_count",
+    "luggage": "primary_luggage_count",
+    "meeting_time": "primary_preferred_time",
+    "address": "primary_address (if transfer)"
+  },
   "primary_service": {
     "service_type": "primary_interested",
     "service_name": "primary_service_selected (matched title/name)",
@@ -1102,6 +1227,14 @@ COMBINED_INVOICE_SCHEMA = {
     "currency": "primary_preferred_currency",
     "description": "primary matched service words/description",
     "refund_policy": "primary matched service refund_text/refund policy"
+  },
+  "secondary_booking_details": {
+    "flight_number": "secondary_flight_number",
+    "flight_date": "secondary_flight_date",
+    "passengers": "secondary_passenger_count",
+    "luggage": "secondary_luggage_count",
+    "meeting_time": "secondary_preferred_time",
+    "address": "secondary_address (if transfer)"
   },
   "secondary_service": {
     "service_type": "secondary_interested",
@@ -1112,8 +1245,7 @@ COMBINED_INVOICE_SCHEMA = {
     "refund_policy": "secondary matched service refund_text/refund policy"
   },
   "email": "primary_email",
-  "total_price": "primary_price + secondary_price (ONLY if same currency; otherwise show both separately)",
-  
+  "total_price": "primary_price + secondary_price (ONLY if same currency; otherwise show both separately)"
 }
 
  IF 'primary_interested' is set but secondary_interested is NOT set
@@ -1127,13 +1259,10 @@ COMBINED_INVOICE_SCHEMA = {
 - If YES: call `send_email_tool(primary_email, "UpgradeVIP Booking Invoice", invoice)`
 - If NO: ask what to change and resume from that step.
 
-
-
-**AIRPORTS LIST FLOW:**
-- If the user asks to see all airports, requests an airport list, or asks for available airports, call `airports_tool()` to fetch and format the airport list.
-- And display output to the user in readable format.
-- Do not ask for flight details or service selection until the user selects an airport or continues with booking.   
-
+**AIRPORT QUERIES:**
+- Count/general ("how many airports", "show all airports") → Reply: "Upgrade VIP operates at over 430 airports worldwide. Please tell me the airport or city you'd like to check." Do NOT display the full list.
+- Specific airport ("do you cover JFK?", "is Heathrow available?") → Call `airports_raw_tool()`, search list case-insensitively, reply "Yes, we operate at [full airport name]." or "No, we don't currently cover [input]."
+- City query ("airports in Paris?", "which airports in Dubai?") → Call `airports_raw_tool()`, filter by city name match, display only the matched airport names. If none found, say "No airports found in [city]."
 
 **SERVICES BY AIRPORT NAME FLOW:**
 - Trigger when user asks for services in a city/airport (e.g., "services in Dubai", "VIP at Heathrow", "transfers at JFK", "Abu Dhabi International Airport").
