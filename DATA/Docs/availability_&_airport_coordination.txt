@@ -1,5 +1,0 @@
-SECTION: SHORT-NOTICE BOOKINGS
-KEYWORDS: last minute booking, short notice, urgent booking, 48 hours, airport availability, advance booking, operational requirements, service provider policies, booking restrictions, booking deadline, booking window
-
-QUESTION: Can VIP services be booked for less than 48 hours before the flight?
-ANSWER: Some VIP services can be booked with short notice depending on airport availability. However, certain airports require advance booking due to operational requirements and local service provider policies. Always check with the service provider for last-minute booking options and airport-specific restrictions.
