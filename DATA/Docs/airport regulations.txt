@@ -1,0 +1,29 @@
+SECTION: AIRPORT_REGULATIONS
+KEYWORDS: airport regulations, immigration rules, security procedures, bypass immigration, bypass security, fast-track lanes, wheelchair services, airline services, airside access, lounge capacity, entry decisions, government authorities, airport authority control, security clearance, immigration control
+
+QUESTION: Can VIP services bypass immigration?
+ANSWER: No. Immigration procedures are controlled by government authorities and cannot be bypassed by VIP services.
+
+QUESTION: Can VIP services bypass airport security checks?
+ANSWER: No. All passengers must pass through airport security checks regardless of VIP services.
+
+QUESTION: Who controls fast-track lanes?
+ANSWER: Fast-track lanes are controlled by airport authorities and immigration departments.
+
+QUESTION: What happens if fast-track is unavailable?
+ANSWER: If fast-track access is unavailable due to airport authority policies or operational conditions, passengers will still receive full escort assistance through standard airport procedures.
+
+QUESTION: Who provides wheelchair services at the airport?
+ANSWER: Wheelchair services are typically provided by the airline and should be requested directly with the airline before travel.
+
+QUESTION: Can VIP agents push wheelchairs?
+ANSWER: Depending on airport regulations agents may assist with wheelchairs, but primary wheelchair service is usually provided by airline staff.
+
+QUESTION: Can VIP agents access restricted airside areas?
+ANSWER: Access to restricted airside areas depends on security clearance granted by airport authorities.
+
+QUESTION: Is lounge access guaranteed?
+ANSWER: Lounge access depends on lounge capacity, airport policies, and the selected service package.
+
+QUESTION: Can immigration refuse entry even with VIP service?
+ANSWER: Yes. Immigration authorities retain full control over entry decisions regardless of VIP services.

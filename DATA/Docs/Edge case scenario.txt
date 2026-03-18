@@ -1,0 +1,23 @@
+SECTION: EDGE_CASE_SCENARIOS
+KEYWORDS: terminal change, gate change, flight early, flight delayed, missed connection, lost baggage, cannot find agent, flight updates, flight monitoring, service adjustment, baggage claims, airline desk, support team, updated itinerary, meeting point update
+
+QUESTION: What happens if my airline changes terminal?
+ANSWER: The meeting point and service instructions will be updated according to the new terminal.
+
+QUESTION: What happens if my airline changes gate?
+ANSWER: VIP agents monitor flight updates and guide passengers to the updated gate.
+
+QUESTION: What happens if my flight arrives early?
+ANSWER: The service team monitors flight schedules and may adjust service timing where possible.
+
+QUESTION: What happens if my flight is delayed?
+ANSWER: Flight delays are monitored and service schedules may be adjusted according to updated flight information.
+
+QUESTION: What happens if I miss my connection?
+ANSWER: Passengers should contact the support team to adjust services according to the updated itinerary.
+
+QUESTION: What happens if my baggage is lost?
+ANSWER: Lost baggage claims must be handled by the airline baggage service desk. VIP agents may assist passengers in locating the airline desk.
+
+QUESTION: What happens if I cannot find the agent?
+ANSWER: Passengers should contact the local service team using the contact information provided in their booking confirmation.

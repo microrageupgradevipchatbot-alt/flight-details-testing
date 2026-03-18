@@ -1,0 +1,23 @@
+SECTION: LOYALTY_PROGRAM
+KEYWORDS: loyalty program, loyalty points, earn points, redeem points, points expiry, points transfer, booking rewards, program benefits, worldwide benefits, points redemption, VIP services redemption, loyalty rewards, program rules, point policies
+
+QUESTION: How does the loyalty program work?
+ANSWER: The loyalty program allows customers to earn points when booking services through the platform.
+
+QUESTION: How are loyalty points earned?
+ANSWER: Points are typically earned based on completed bookings and may depend on the value of the booking.
+
+QUESTION: How can loyalty points be redeemed?
+ANSWER: Loyalty points can be redeemed for eligible services or benefits depending on the program rules.
+
+QUESTION: Do loyalty points expire?
+ANSWER: Loyalty points may expire after a defined period of inactivity depending on the program policy.
+
+QUESTION: Are loyalty points transferable?
+ANSWER: Transferability of loyalty points depends on the loyalty program policies.
+
+QUESTION: Can loyalty points be used for VIP services?
+ANSWER: Loyalty points may be redeemed for VIP services depending on the program rules.
+
+QUESTION: Are loyalty program benefits available worldwide?
+ANSWER: Loyalty benefits may apply globally depending on service availability and program policies.

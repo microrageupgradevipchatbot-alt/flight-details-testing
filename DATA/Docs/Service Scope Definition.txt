@@ -1,0 +1,44 @@
+SECTION: SERVICE_SCOPE_DEFINITIONS
+KEYWORDS: arrival service, departure service, transit service, vip service, vvip service, meet and greet, fast track, lounge access, porter service, baggage assistance, luggage help, immigration escort, security escort, wheelchair assistance, meeting point, airport escort, airside access, boarding gate, terminal entrance
+
+QUESTION: What is included in Arrival VIP service?
+ANSWER: Arrival VIP service includes meeting the passenger at the arrival gate or terminal entrance depending on airport regulations, escorting the passenger through immigration where permitted, assisting with baggage collection, and guiding the passenger through customs to the airport exit or transfer area.
+
+QUESTION: What is included in Departure VIP service?
+ANSWER: Departure VIP service includes meeting the passenger at the terminal entrance, assisting with airline check-in procedures, escorting the passenger through security and passport control where available, assisting with baggage, and guiding the passenger to the lounge or boarding gate.
+
+QUESTION: What is included in Transit VIP service?
+ANSWER: Transit VIP service assists passengers connecting between flights. The agent meets the passenger at the arrival gate or terminal, escorts them through transit security or immigration if required, and guides them to the next departure gate.
+
+QUESTION: What is NOT included in Airport VIP service?
+ANSWER: Airport VIP services do not include airline tickets, airline baggage handling responsibility, immigration privileges, or bypassing airport security procedures. All security and immigration procedures remain under the control of airport and government authorities.
+
+QUESTION: Does Airport VIP include porter service?
+ANSWER: Porter service availability depends on the airport and service package. Some VIP services include luggage assistance, while others offer porter service as an optional add-on.
+
+QUESTION: Does Airport VIP include lounge access automatically?
+ANSWER: Lounge access depends on the selected service package and airport availability. Some VIP services include lounge access, while others offer it as an optional upgrade.
+
+QUESTION: Does Airport VIP include airport transfers?
+ANSWER: Airport transfers are typically booked separately from airport VIP services. However, some service packages may include transfers depending on airport and service provider.
+
+QUESTION: What is the difference between VIP and VVIP services?
+ANSWER: VIP services provide enhanced airport assistance such as meet and greet, escort through airport procedures, and fast-track access where available. VVIP services may include private terminals, private security processing, and exclusive lounge facilities depending on airport availability.
+
+QUESTION: What is the difference between Meet and Greet and VIP service?
+ANSWER: Meet and Greet services primarily focus on greeting passengers and escorting them through airport procedures. VIP services may include additional features such as fast-track access, lounge entry, and enhanced concierge assistance.
+
+QUESTION: Is Meet and Greet the same as Fast Track?
+ANSWER: No. Meet and Greet refers to assistance provided by a service agent escorting the passenger through the airport. Fast Track refers to priority access through security or immigration lanes where available.
+
+QUESTION: Can Fast Track be booked separately?
+ANSWER: In some airports Fast Track can be booked as a standalone service. In other locations it may only be available as part of a VIP or Meet and Greet package.
+
+QUESTION: Do VIP agents escort passengers through immigration?
+ANSWER: Agents may escort passengers through immigration areas where permitted by airport regulations. Immigration decisions remain under the authority of government officials.
+
+QUESTION: Do VIP agents escort passengers to the aircraft door?
+ANSWER: Escort to the aircraft door depends on airport security regulations and whether the service provider has airside access permission.
+
+QUESTION: Where do passengers meet the VIP agent?
+ANSWER: Meeting points vary depending on the airport and service type. Passengers receive detailed meeting instructions in their booking confirmation once the service is arranged.
