@@ -30,9 +30,9 @@ from langgraph.prebuilt import create_react_agent
 
 #============================================== .env  =========================================================
 load_dotenv()
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+# GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
-# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 def setup_paths():
     current_dir = Path(__file__).parent
     data_dir = current_dir / "DATA"
@@ -71,18 +71,18 @@ if  GOOGLE_API_KEY:
 else:
     logger.info("GOOGLE_API_KEY not found. Please set it in your environment or .env file.")
 
-if not st.secrets.get("DEV_URL"):  
-    logger.warning("DEV_URL not found. Please set it in your environment or .env file.")
-if not st.secrets.get("API_KEY"):  
-    logger.warning("API_KEY not found. Please set it in your environment or .env file.")  
-dev_url = st.secrets.get("DEV_URL")
-api_key = st.secrets.get("API_KEY")
-# if not os.getenv("DEV_URL"):  
+# if not st.secrets.get("DEV_URL"):  
 #     logger.warning("DEV_URL not found. Please set it in your environment or .env file.")
-# if not os.getenv("API_KEY"):  
+# if not st.secrets.get("API_KEY"):  
 #     logger.warning("API_KEY not found. Please set it in your environment or .env file.")  
-# dev_url = os.getenv("DEV_URL")
-# api_key = os.getenv("API_KEY")
+# dev_url = st.secrets.get("DEV_URL")
+# api_key = st.secrets.get("API_KEY")
+if not os.getenv("DEV_URL"):  
+    logger.warning("DEV_URL not found. Please set it in your environment or .env file.")
+if not os.getenv("API_KEY"):  
+    logger.warning("API_KEY not found. Please set it in your environment or .env file.")  
+dev_url = os.getenv("DEV_URL")
+api_key = os.getenv("API_KEY")
 #===============================================Flight Functions================================================================
 
 def get_flight_details_from_api(flight_number: str, flight_date: str) -> dict:
@@ -201,10 +201,10 @@ def get_vip_services(airport_id: str, travel_type: str, currency: str, service_i
             }
         except Exception as e:
             logger.error(f"❌ Invalid JSON response from Production: {e}")
-            return "Sorry Invalid JSON response from VIP services API"
+            return {"error": "Invalid JSON response", "message": "VIP services API returned invalid data format", "data": []}
     except Exception as e:
         logger.error(f"❌ VIP services API request failed: {e}")
-        return "Sorry VIP services API request failed"
+        return {"error": "Request failed", "message": str(e), "data": []}
 
 def format_vip_services_message(vip_data, passenger_count, preferred_currency):
     logger.info(f"🚪 Inside Formatting vip_services function")
@@ -261,140 +261,77 @@ def format_vip_services_message(vip_data, passenger_count, preferred_currency):
     logger.info(f"✈️ Formatted VIP services message: {msg}")
     return msg
 #======================================invoice====================================
-def build_single_invoice_html(
-    title: str,
-    service_type: str,
-    service_name: str,
-    price: float,
-    currency: str,
-    email: str,
-    description: str,
-    refund_policy: str,
-    flight_number: str = None,
-    flight_date: str = None,
-    passengers: int = None,
-    luggage: int = None,
-    meeting_time: str = None,
-    address: str = None
-) -> str:
-    logger.info("🚪 Inside build_single_invoice_html")
-    currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
-    symbol = currency_symbols.get(currency, "$")
-    service_type_display = "Airport VIP" if service_type == "vip" else "Airport Transfer"
-    
-    invoice = f"""
-    <h2><b>{title} - {service_type_display}</b></h2>
-    <br>
-    <h3>📋 Booking Details:</h3>
-    <b>Flight Number:</b> {flight_number}<br>
-    <b>Flight Date:</b> {flight_date}<br>
-    <b>Passengers:</b> {passengers}<br>
-    <b>Luggage:</b> {luggage}<br>
-    <b>Meeting Time:</b> {meeting_time}<br>
-    {f"<b>Address:</b> {address}<br>" if address else ""}
-    <br>
-    <hr>
-    <h3>🎫 Service Details:</h3>
-    <b>Service:</b> {service_name}<br>
-    <b>Price:</b> {symbol}{price} {currency}<br>
-    <b>Email:</b> {email}<br>
-    <b>Description:</b> {description}<br>
-    <b>Refund Policy:</b> {refund_policy}
-    """
-    logger.info(f"🎫 Single Invoice Output:\n{invoice}")
-    return invoice
-def build_combined_invoice_html(
-    title: str,
-    # Primary booking details
-    primary_flight_number: str,
-    primary_flight_date: str,
-    primary_passengers: int,
-    primary_luggage: int,
-    primary_meeting_time: str,
-    primary_address: str,
-    # Primary service
-    primary_service_type: str,
-    primary_service_name: str,
-    primary_price: float,
-    primary_currency: str,
-    primary_description: str,
-    primary_refund_policy: str,
-    # Secondary booking details
-    secondary_flight_number: str,
-    secondary_flight_date: str,
-    secondary_passengers: int,
-    secondary_luggage: int,
-    secondary_meeting_time: str,
-    secondary_address: str,
-    # Secondary service
-    secondary_service_type: str,
-    secondary_service_name: str,
-    secondary_price: float,
-    secondary_currency: str,
-    secondary_description: str,
-    secondary_refund_policy: str,
-    email: str
-) -> str:
-    logger.info("🚪 Inside build_combined_invoice_html")
-    currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
-    primary_symbol = currency_symbols.get(primary_currency, "$")
-    secondary_symbol = currency_symbols.get(secondary_currency, "$")
-    primary_type_display = "Airport VIP" if primary_service_type == "vip" else "Airport Transfer"
-    secondary_type_display = "Airport VIP" if secondary_service_type == "vip" else "Airport Transfer"
 
-    if primary_currency == secondary_currency:
-        total = primary_price + secondary_price
-        total_line = f"<b>Total Price:</b> {primary_symbol}{total} {primary_currency}"
+def build_dynamic_invoice_html(title: str, bookings: List[Dict[str, Any]], email: str) -> str:
+    """Build one invoice for any number of bookings (cart-style)."""
+    logger.info("🚪 Inside build_dynamic_invoice_html")
+
+    if not bookings:
+        return "<h2><b>UpgradeVIP</b></h2><p>No bookings found.</p>"
+
+    currency_symbols = {"USD": "$", "EUR": "€", "GBP": "£"}
+    totals_by_currency: Dict[str, float] = {}
+    sections: List[str] = [f"<h2><b>{title} - Combined Booking</b></h2>", "<br>"]
+
+    for i, booking in enumerate(bookings, 1):
+        service_type = str(booking.get("service_type", "")).lower()
+        service_type_display = "Airport VIP" if service_type == "vip" else "Airport Transfer"
+
+        selected = booking.get("selected_service") or {}
+        service_name = selected.get("name") or booking.get("service_name") or "N/A"
+        service_currency = selected.get("currency") or booking.get("preferred_currency") or booking.get("currency") or "USD"
+
+        raw_price = selected.get("price", booking.get("price", 0))
+        try:
+            price = float(raw_price)
+        except (TypeError, ValueError):
+            price = 0.0
+
+        totals_by_currency[service_currency] = totals_by_currency.get(service_currency, 0.0) + price
+        symbol = currency_symbols.get(service_currency, "")
+
+        description = selected.get("description") or booking.get("description") or "N/A"
+        refund_policy = selected.get("refund_policy") or booking.get("refund_policy") or "N/A"
+        address = booking.get("address")
+        address_html = f"<b>Address:</b> {address}<br>" if address else ""
+
+        sections.append(f"<h3>🎫 SERVICE #{i}</h3>")
+        sections.append("<h4>📋 Booking Details:</h4>")
+        sections.append(f"<b>Service Type:</b> {service_type_display}<br>")
+        sections.append(f"<b>Flight Number:</b> {booking.get('flight_number', 'N/A')}<br>")
+        sections.append(f"<b>Flight Date:</b> {booking.get('flight_date', 'N/A')}<br>")
+        sections.append(f"<b>Travel Type:</b> {booking.get('arrival_or_departure', 'N/A')}<br>")
+        sections.append(f"<b>Passengers:</b> {booking.get('passenger_count', 'N/A')}<br>")
+        sections.append(f"<b>Luggage:</b> {booking.get('luggage_count', 'N/A')}<br>")
+        sections.append(f"<b>Meeting Time:</b> {booking.get('preferred_time', 'N/A')}<br>")
+        sections.append(address_html)
+        sections.append("<h4>Service Details:</h4>")
+        sections.append(f"<b>Service:</b> {service_name}<br>")
+        sections.append(f"<b>Price:</b> {symbol}{price:.2f} {service_currency}<br>")
+        sections.append(f"<b>Description:</b> {description}<br>")
+        sections.append(f"<b>Refund Policy:</b> {refund_policy}<br>")
+        if booking.get("message_for_steward"):
+            sections.append(f"<b>Message for Steward:</b> {booking.get('message_for_steward')}<br>")
+        sections.append("<hr>")
+
+    sections.append("<h3>Total</h3>")
+    if len(totals_by_currency) == 1:
+        only_currency = list(totals_by_currency.keys())[0]
+        symbol = currency_symbols.get(only_currency, "")
+        sections.append(f"<b>Grand Total:</b> {symbol}{totals_by_currency[only_currency]:.2f} {only_currency}<br>")
     else:
-        total_line = (
-            f"<b>Total Price:</b><br>"
-            f"Primary: {primary_symbol}{primary_price} {primary_currency}<br>"
-            f"Secondary: {secondary_symbol}{secondary_price} {secondary_currency}"
-        )
+        sections.append("<b>Grand Total by Currency:</b><br>")
+        for cur, amount in totals_by_currency.items():
+            symbol = currency_symbols.get(cur, "")
+            sections.append(f"- {symbol}{amount:.2f} {cur}<br>")
 
-    invoice = f"""
-    <h2><b>{title} - Combined Booking</b></h2>
-    <br>
-    
-    <h3>🎫 PRIMARY SERVICE</h3>
-    <h4>📋 Booking Details:</h4>
-    <b>Flight Number:</b> {primary_flight_number}<br>
-    <b>Flight Date:</b> {primary_flight_date}<br>
-    <b>Passengers:</b> {primary_passengers}<br>
-    <b>Luggage:</b> {primary_luggage}<br>
-    <b>Meeting Time:</b> {primary_meeting_time}<br>
-    {f"<b>Address:</b> {primary_address}<br>" if primary_address else ""}
-    
-    <h4>Service Details:</h4>
-    <b>Service:</b> {primary_service_name} ({primary_type_display})<br>
-    <b>Price:</b> {primary_symbol}{primary_price} {primary_currency}<br>
-    <b>Description:</b> {primary_description}<br>
-    <b>Refund Policy:</b> {primary_refund_policy}
-    
-    <hr>
-    
-    <h3>🎫 SECONDARY SERVICE</h3>
-    <h4>📋 Booking Details:</h4>
-    <b>Flight Number:</b> {secondary_flight_number}<br>
-    <b>Flight Date:</b> {secondary_flight_date}<br>
-    <b>Passengers:</b> {secondary_passengers}<br>
-    <b>Luggage:</b> {secondary_luggage}<br>
-    <b>Meeting Time:</b> {secondary_meeting_time}<br>
-    {f"<b>Address:</b> {secondary_address}<br>" if secondary_address else ""}
-    
-    <h4>Service Details:</h4>
-    <b>Service:</b> {secondary_service_name} ({secondary_type_display})<br>
-    <b>Price:</b> {secondary_symbol}{secondary_price} {secondary_currency}<br>
-    <b>Description:</b> {secondary_description}<br>
-    <b>Refund Policy:</b> {secondary_refund_policy}
-    
-    <hr>
-    {total_line}
-    <br><br>
-    <b>📧 Email:</b> {email}
-    """
-    logger.info(f"🎫 Combined Invoice Output:\n{invoice}")
+    sections.append("<br>")
+    sections.append(f"<b>📧 Email:</b> {email}")
+
+    invoice = "\n".join(sections)
+    logger.info(f"🎫 Dynamic Invoice Output:\n{invoice}")
     return invoice
+
 #====================transfer service functions=======================
 
 def get_transport_services(airport_id: str, currency: str) -> dict:
@@ -440,10 +377,10 @@ def get_transport_services(airport_id: str, currency: str) -> dict:
             }
         except Exception as e:
             logger.error(f"❌ Invalid JSON response from Production: {e}")
-            return "Invalid Json response "
+            return {"error": "Invalid JSON response", "message": "Transport services API returned invalid data format", "data": []}
     except Exception as e:
         logger.error(f"❌ Transport services API request failed: {e}")
-        return "Sorry API request for vehicles failed "
+        return {"error": "Request failed", "message": str(e), "data": []}
 def format_transport_services_message(transport_data, preferred_currency):
     logger.info(f"🚪 Inside Formatting transport services message function")
     vehicles = transport_data.get("data", []) if transport_data else []
@@ -486,14 +423,14 @@ def send_email(to_email, subject, message):
     logger.info(f"🚪 Inside send email function")
     
     # Replace with your SMTP server details
-    smtp_server = st.secrets["SMTP_SERVER"]
-    smtp_port = int(st.secrets["SMTP_PORT"])
-    smtp_user = st.secrets["SMTP_USER"]
-    smtp_pass = st.secrets["SMTP_PASS"]
-    # smtp_server = os.getenv("SMTP_SERVER")
-    # smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    # smtp_user = os.getenv("SMTP_USER")
-    # smtp_pass = os.getenv("SMTP_PASS")
+    # smtp_server = st.secrets["SMTP_SERVER"]
+    # smtp_port = int(st.secrets["SMTP_PORT"])
+    # smtp_user = st.secrets["SMTP_USER"]
+    # smtp_pass = st.secrets["SMTP_PASS"]
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
     msg = MIMEText(message,'html')
     msg["Subject"] = subject
     msg["From"] = smtp_user
@@ -795,79 +732,9 @@ def rag_query_tool(query: str, chat_history: Optional[List[Dict[str, str]]] = No
 #=============================invoice tools========================
 
 @tool
-def build_single_invoice_html_tool(
-    title: str,
-    service_type: str,
-    service_name: str,
-    price: float,
-    currency: str,
-    email: str,
-    description: str,
-    refund_policy: str,
-    flight_number: str = None,
-    flight_date: str = None,
-    passengers: int = None,
-    luggage: int = None,
-    meeting_time: str = None,
-    address: str = None
-) -> str:
-    """
-    Generate a single-service HTML invoice.
-    Parameters match SINGLE_INVOICE_SCHEMA.
-    """
-    return build_single_invoice_html(
-        title, service_type, service_name, price, currency, email, description, refund_policy,
-        flight_number, flight_date, passengers, luggage, meeting_time, address
-    )
-@tool
-def build_combined_invoice_html_tool(
-    title: str,
-    # Primary booking details
-    primary_flight_number: str,
-    primary_flight_date: str,
-    primary_passengers: int,
-    primary_luggage: int,
-    primary_meeting_time: str,
-    primary_address: str,
-    # Primary service
-    primary_service_type: str,
-    primary_service_name: str,
-    primary_price: float,
-    primary_currency: str,
-    primary_description: str,
-    primary_refund_policy: str,
-    # Secondary booking details
-    secondary_flight_number: str,
-    secondary_flight_date: str,
-    secondary_passengers: int,
-    secondary_luggage: int,
-    secondary_meeting_time: str,
-    secondary_address: str,
-    # Secondary service
-    secondary_service_type: str,
-    secondary_service_name: str,
-    secondary_price: float,
-    secondary_currency: str,
-    secondary_description: str,
-    secondary_refund_policy: str,
-    email: str
-) -> str:
-    """
-    Generate a combined-services HTML invoice.
-    Parameters match COMBINED_INVOICE_SCHEMA.
-    """
-    return build_combined_invoice_html(
-        title,
-        primary_flight_number, primary_flight_date, primary_passengers,
-        primary_luggage, primary_meeting_time, primary_address,
-        primary_service_type, primary_service_name, primary_price,
-        primary_currency, primary_description, primary_refund_policy,
-        secondary_flight_number, secondary_flight_date, secondary_passengers,
-        secondary_luggage, secondary_meeting_time, secondary_address,
-        secondary_service_type, secondary_service_name, secondary_price,
-        secondary_currency, secondary_description, secondary_refund_policy,
-        email
-    )
+def build_dynamic_invoice_html_tool(title: str, bookings: List[Dict[str, Any]], email: str) -> str:
+    """Generate a single combined invoice for any number of bookings."""
+    return build_dynamic_invoice_html(title, bookings, email)
 
 
 #==============================================flight tools=========================================================
@@ -961,20 +828,40 @@ def format_transport_services_tool(
 
 
 #========================================== Email Sending tool ===============================================================
+# @tool
+# def send_email_tool(to_email: str, subject: str, message: str) -> bool:
+#     """
+#     Send booking/invoice email to the user.
+
+#     Parameters:
+#       to_email (str): Recipient email address.
+#       subject (str): Email subject (e.g. "Your UpgradeVIP Booking Invoice").
+#       message (str): Email body (HTML or plain text).
+
+#     Returns:
+#       bool: True if email was sent successfully, False otherwise.
+#     """
+#     return send_email(to_email, subject, message)
+
 @tool
-def send_email_tool(to_email: str, subject: str, message: str) -> bool:
+def checkout_and_send_invoice_tool(title: str, bookings: List[Dict[str, Any]], email: str) -> dict:
     """
-    Send booking/invoice email to the user.
-
-    Parameters:
-      to_email (str): Recipient email address.
-      subject (str): Email subject (e.g. "Your UpgradeVIP Booking Invoice").
-      message (str): Email body (HTML or plain text).
-
-    Returns:
-      bool: True if email was sent successfully, False otherwise.
+    Build invoice and send email in one atomic tool call.
+    This avoids passing large HTML payload between separate tool calls.
     """
-    return send_email(to_email, subject, message)
+    if not bookings:
+        return {"ok": False, "message": "No bookings found.", "email_sent": False}
+
+    invoice = build_dynamic_invoice_html(title, bookings, email)
+    sent = send_email(email, "UpgradeVIP Booking Invoice", invoice)
+
+    return {
+        "ok": bool(sent),
+        "email_sent": bool(sent),
+        "email": email,
+        "message": "Invoice emailed successfully." if sent else "Failed to send invoice email.",
+        "invoice": invoice,
+    }
 #========================================== Airports List tool ===============================================================
 @tool
 def airports_tool():
@@ -1035,9 +922,9 @@ tools = [   flight_details_tool,
             format_transport_services_tool,
             
             
-            send_email_tool,
-            build_single_invoice_html_tool,
-            build_combined_invoice_html_tool,
+            # send_email_tool,
+            build_dynamic_invoice_html_tool,
+            checkout_and_send_invoice_tool,
 
             # airports_tool,
             airports_raw_tool,
@@ -1065,243 +952,126 @@ memory = InMemorySaver()
 SYSTEM_PROMPT = """
 -> For out-of-scope questions or greetings or general queries etc which are not in this prompt call `rag_query_tool(query, chat_history)` where query: string containing the user's current message and chat_history[-4:]: list of the last 4 conversation turns, each as a dict with keys "user" and "assistant" For Example: [{"user": "Hello", "assistant": "Hi there!"}, {"user": "What services?", "assistant": "We offer..."}].
 
-**ROLE**:
-Booking only (Airport VIP or Transfers).
+**ROLE:**
+Booking assistant for Airport VIP and Airport Transfer.
 
-HARD GATE:
-- If user clearly states interest (e.g., "I want airport vip"), extract it immediately and store any other details provided (flight number, date, etc.) for later use.
-- **MANDATORY (NEVER SKIP):** Once `primary_interested` is captured, you MUST ALWAYS ask the website/chat question before anything else, even if the user provided flight number, date, or other details in the same message:
-  "Would you like to book on our website or here in chat?
-   1) Website: https://order.upgradevip.com/
-   2) Chat: Continue here
-   Reply with 1 or 2."
-  IF user replies "1" → provide website link and end conversation.
-  IF user replies "2" → proceed to STEP-1 of BOOKING FLOW.
-- If user provides other details (flight number, date) before or alongside stating service type, STORE them silently and reuse them in the booking flow — do NOT re-ask for already-provided details.
-- The ONLY question that is NEVER skipped is the website/chat choice above.
+**SMART FIELD REUSE (IMPORTANT):**
+- Extract any booking fields already provided by user in the same or previous messages (service type, flight number, flight date, arrival/departure, passengers, luggage, currency, etc.) and store them in extracted_info.current_booking.
+- Ask only missing fields.
+- Never re-ask a field that already has a valid value unless the user asks to change it.
+- Example: if user says "book vip, flight date is 10/03/2026", do not ask for flight date again; ask next missing field (like flight number).
 
+**MANDATORY GATE:**
+- When booking intent is detected, always ask:
+    "Would you like to book on our website or here in chat?
+     1) Website: https://order.upgradevip.com/
+     2) Chat: Continue here
+     Reply with 1 or 2."
+- If user replies 1: share link and stop booking flow.
+- If user replies 2: continue booking flow.
 
-'extracted_info' is a dict in which you will store all the information you collect from the user during the conversation these are the only entities you have store in extracted_info dict:
-    "primary_interested":  "vip" or "transfer",
-    "primary_flight_number": ly001 or BA111 etc,
-    "primary_flight_date": ,
-    "primary_flight_details": flight details object returned by flight_details_tool,
-    "primary_Arrival_or_departure": arrival or departure,
-    "primary_flight_class": economy/plus, business, first,
-    "primary_passenger_count": integer number,
-    "primary_luggage_count": integer number,
-    "primary_preferred_currency": USD, EUR, GBP,
-    "primary_get_services": vip services object returned by vip_services_tool,
-    "primary_airport_transfer_details": transport services object returned by transport_services_tool,
-    "primary_service_selected": service name or number,
-    "primary_price": price of selected service,
-    "primary_preferred_time": ,
-    "primary_msg_for_steward": ,
-    "primary_email": ,
-    "primary_address": ,
-    "primary_confirmation": yes or no,
-    "primary_asked_second": yes or no,
-    "secondary_interested": "vip" or "transfer",
-    "secondary_flight_number": ly001 or BA111 etc,
-    "secondary_flight_date": ,
-    "secondary_flight_details": flight details object returned by flight_details_tool,
-    "secondary_Arrival_or_departure": arrival or departure,
-    "secondary_flight_class": economy/plus, business, first,
-    "secondary_passenger_count": integer number,
-    "secondary_luggage_count": integer number,
-    "secondary_preferred_currency": USD, EUR, GBP,
-    "secondary_get_services": vip services object returned by vip_services_tool,
-    "secondary_airport_transfer_details": transport services object returned by transport_services_tool,
-    "secondary_service_selected": service name or number,
-    "secondary_price": price of selected service,
-    "secondary_preferred_time": ,
-    "secondary_msg_for_steward": ,
-    "secondary_email": ,
-    "secondary_address": ,
-    "secondary_confirmation": yes or no
-
-NOTE: when its time to pass extracted_info to any tool always pass the full dict and make value NULL of those entities which you have not collected yet.    
-
-**MULTI SERVICE SELECTION (STRICT)**
-- Ask for add-on service .
-- ask:
-  - If `primary_interested` == "vip": "Do you want to book airport transfer service as well? (yes/no)"
-  - Else: "Do you want to book airport VIP service as well? (yes/no)"
-- Save reply to `primary_asked_second` ("yes" or "no").
-
-IF `primary_asked_second` == "yes":
-- Set `secondary_interested` to the opposite service.
-- Follow **BOOKING FLOW** again for the secondary service and store answers as `secondary_*` in 'extracted_info'.
-- IMPORTANT:
-  - Collect secondary STEP-1 → STEP-10a completely (do NOT skip preferred time or address).
-  - Do NOT generate any invoice until secondary required fields are collected.
-  - Set `secondary_email = primary_email` .
-
-IF `primary_asked_second` == "no":
-- Proceed to invoice (STEP-11).
-
-        
-**BOOKING FLOW**
--> after getting user interest 'vip' or 'transfer' extracted in 'primary_interested' then follow the respective flow below.
-STEP-1: After getting 'primary_interested', ask for flight number (show example: LY001, BA111). 
-STEP-2: ask for date (show example: 10/31/25, in MM/DD/YYYY format).
-STEP-3: After having primary_interested, primary_flight_number,primary_flight_date, IMMEDIATELY call `flight_details_tool(primary_flight_number, primary_flight_date)` to fetch flight details.
-        - Present the flight details to the user using `format_flight_choice_tool`.
-STEP-4: Then ask user for travel type (Arrival or Departure).
-STEP-5: Then ask user for number of adults (also showing user : children above 2 also included ; range is 1-10).
-STEP-6: Then ask for and luggage (range is 1-10).
-STEP-7: Then ask user for preferred currency (USD, EUR, GBP).
-STEP-8: Fetch and display services:
-        IF primary_interested is 'transfer':
-              Call `only_transfer_services_tool(airport_id, currency)`:
-                 - airport_id: `origin_airport` (Departure) or `destination_airport` (Arrival) from primary_flight_details
-                 - currency: primary_preferred_currency
-              Display output → Ask: "Please select a service by name or number i.e 1,2 etc."
-              If tool returns "Sorry, no transport services are available...":**
-                 - Display the exact message to user
-                
-        ELSE IF primary_interested is 'vip':
-              Call `only_vip_services_tool(airport_id, travel_type, currency, passenger_count)`:
-                 - airport_id: `origin_airport` (Departure) or `destination_airport` (Arrival) from primary_flight_details
-                 - travel_type: primary_Arrival_or_departure
-                 - currency: primary_preferred_currency
-                 - passenger_count: primary_passenger_count
-              Display output → Ask: "Please select a service by name or number i.e 1,2 etc."
-              If tool returns "Sorry, no VIP services are available...":**
-                 - Display the exact message to user
-                
-STEP-9: Ask for message for steward. 
-STEP-10: After that Then you have to ask for preferred time of meeting to the user.
-STEP-10a:  Only Ask for address from user if 'primary_interested' is 'transfer' otherwise skip it.
-STEP-11: After that Then you have to Ask for Email id of the user.
-STEP-11b (ADD-ON CHECK):
-- After STEP-11, run **MULTI SERVICE SELECTION (STRICT)**.
-
-STEP-11c (SUMMARY DISPLAY):
-- Before generating invoice, display a summary:
-  "Please review your booking:
-   Flight: [number] on [date]
-   Service: [primary_service_name]
-   Passengers: [count]
-   ... etc"
-- Ask: "Is this correct? (yes/no)"
-- If no, ask what to change
-- If yes, proceed to STEP-12
-
-STEP-12: After you have collected the user's email:
-1) Immediately assemble ALL previously collected booking info into a dict called `extracted_info` (include ALL required keys; set missing to null).
-2) Create invoice schema(s) (mapping-only; do NOT invent values):
-
-SINGLE_INVOICE_SCHEMA = {
-  "title": "UpgradeVIP",
-  "booking_details": {
-    "flight_number": "primary_flight_number",
-    "flight_date": "primary_flight_date",
-    "passengers": "primary_passenger_count",
-    "luggage": "primary_luggage_count",
-    "meeting_time": "primary_preferred_time"
-  },
-  "service_type": "primary_interested",
-  "service_name": "primary_service_selected (matched title/name)",
-  "price": "primary_price",
-  "currency": "primary_preferred_currency",
-  "email": "primary_email",
-  "description": "matched service words/description",
-  "refund_policy": "matched service refund_text/refund policy"
+STATE (use this shape in extracted_info):
+{
+    "email": null,
+    "bookings": [],
+    "current_booking": {
+        "service_type": null,
+        "flight_number": null,
+        "flight_date": null,
+        "flight_details": null,
+        "arrival_or_departure": null,
+        "passenger_count": null,
+        "luggage_count": null,
+        "preferred_currency": null,
+        "selected_service": {
+            "name": null,
+            "price": null,
+            "currency": null,
+            "description": null,
+            "refund_policy": null
+        },
+        "preferred_time": null,
+        "message_for_steward": null,
+        "address": null
+    }
 }
 
-COMBINED_INVOICE_SCHEMA = {
-  "title": "UpgradeVIP",
-  "primary_booking_details": {
-    "flight_number": "primary_flight_number",
-    "flight_date": "primary_flight_date",
-    "passengers": "primary_passenger_count",
-    "luggage": "primary_luggage_count",
-    "meeting_time": "primary_preferred_time",
-    "address": "primary_address (if transfer)"
-  },
-  "primary_service": {
-    "service_type": "primary_interested",
-    "service_name": "primary_service_selected (matched title/name)",
-    "price": "primary_price",
-    "currency": "primary_preferred_currency",
-    "description": "primary matched service words/description",
-    "refund_policy": "primary matched service refund_text/refund policy"
-  },
-  "secondary_booking_details": {
-    "flight_number": "secondary_flight_number",
-    "flight_date": "secondary_flight_date",
-    "passengers": "secondary_passenger_count",
-    "luggage": "secondary_luggage_count",
-    "meeting_time": "secondary_preferred_time",
-    "address": "secondary_address (if transfer)"
-  },
-  "secondary_service": {
-    "service_type": "secondary_interested",
-    "service_name": "secondary_service_selected (matched title/name)",
-    "price": "secondary_price",
-    "currency": "secondary_preferred_currency",
-    "description": "secondary matched service words/description",
-    "refund_policy": "secondary matched service refund_text/refund policy"
-  },
-  "email": "primary_email",
-  "total_price": "primary_price + secondary_price (ONLY if same currency; otherwise show both separately)"
-}
+**BOOKING FLOW (LOOP):**
+1) Ask service type (vip/transfer) only if missing.
+2) Ask flight number (LY001, BA111) only if missing.
+3) Ask flight date (MM/DD/YYYY) only if missing.
+4) Call flight_details_tool, then call format_flight_choice_tool and return its output exactly as-is (no rewrite, no summary, no extra text).
+5) Ask Arrival or Departure only if missing.
+6) Ask passenger count (1-10) only if missing.
+7) Ask luggage count (1-10) only if missing.
+8) Ask currency (USD/EUR/GBP) only if missing.
+9) Fetch services:
+     - vip: only_vip_services_tool(airport_id, travel_type, currency, passenger_count)
+     - transfer: only_transfer_services_tool(airport_id, currency)
+     airport_id from flight_details:
+     - Departure -> origin_airport
+     - Arrival -> destination_airport
+    - Return the selected tool output exactly as-is (no paraphrase or reformat).
+10) Ask service selection by name or number, then map to selected_service with name/price/currency/description/refund_policy.
+11) Ask message for steward.
+12) Ask preferred meeting time.
+13) If transfer, ask address. If vip, skip address.
+14) Append current_booking to bookings.
+15) Ask: "Do you want to add another service? (yes/no)"
+        - yes: reset current_booking and repeat flow.
+        - no: proceed checkout.
 
- IF 'primary_interested' is set but secondary_interested is NOT set
-    - call 'build_single_invoice_html_tool' with 'SINGLE_INVOICE_SCHEMA'.
-    - display invoice to user.
- Else
-    - call 'build_combined_invoice_html_tool' with 'COMBINED_INVOICE_SCHEMA'.
-    - display invoice to user.
+**CHECKOUT:**
+1) Ask email once if missing.
+2) Show brief summary of all bookings.
+3) Ask: "Is this correct? (yes/no)"
+4) If yes:
+     - ask: "Please confirm (yes/no)."
+    - if yes: call checkout_and_send_invoice_tool("UpgradeVIP", bookings, email)
+    - if tool result ok=true: confirm email sent successfully
+    - if tool result ok=false: apologize and ask user to retry or update email
+     - if no: ask what to change and continue
 
-3) Ask confirmation: skip a line then :"Please confirm (yes/no)."
-- If YES: call `send_email_tool(primary_email, "UpgradeVIP Booking Invoice", invoice)`
-- If NO: ask what to change and resume from that step.
+**RULES:**
+- Never invent values.
+- Never generate invoice when bookings is empty.
+- Keep totals per currency if mixed currencies.
+- If no services returned, tell user and ask to change travel type or currency.
+- For output from format_flight_choice_tool, format_vip_services_tool, format_transport_services_tool, only_vip_services_tool, only_transfer_services_tool: return verbatim tool text only.
+- Do not paraphrase, reorder, shorten, add emojis, or add extra commentary around these tool outputs.
+- If tool returns an error or empty-result message, return that message exactly as-is.
+- Keep replies concise outside mandatory booking questions and verbatim tool output.
 
 **AIRPORT QUERIES:**
-- Count/general ("how many airports", "show all airports") → Reply: "Upgrade VIP operates at over 430 airports worldwide. Please tell me the airport or city you'd like to check." Do NOT display the full list.
-- Specific airport ("do you cover JFK?", "is Heathrow available?") → Call `airports_raw_tool()`, search list case-insensitively, reply "Yes, we operate at [full airport name]." or "No, we don't currently cover [input]."
-- City query ("airports in Paris?", "which airports in Dubai?") → Call `airports_raw_tool()`, filter by city name match, display only the matched airport names. If none found, say "No airports found in [city]."
+- Count/general: "Upgrade VIP operates at over 430 airports worldwide. Please tell me the airport or city you'd like to check."
+- Specific airport/city: use airports_raw_tool with case-insensitive matching.
 
 **SERVICES BY AIRPORT NAME FLOW:**
-- Trigger when user asks for services in a city/airport (e.g., "services in Dubai", "VIP at Heathrow", "transfers at JFK", "Abu Dhabi International Airport").
+- Trigger when user asks for services in a city/airport (examples: "services in Dubai", "VIP at Heathrow", "transfers at JFK", "Abu Dhabi International Airport").
 
-**Step 1: Extract and Match Airport**
-1. Extract the airport name from the user's message (e.g., "Abu Dhabi", "Dubai", "Heathrow").
-2. **Immediately call `airports_raw_tool()`** to fetch the full airport list.
-3. **Search the returned list** for a matching airport by comparing the user's input (case-insensitive) against the `airport_name` field.
-   - Match logic: Check if the user's input appears anywhere in the `airport_name` string.
-   - Example: User says "Abu Dhabi" → Match "Abu Dhabi International Airport AUH" → Extract `"id": "204"`.
-4. **Extract the `id` field**  from the matched airport object and store it internally as airport_ID (do NOT display the ID or technical details to the user).
-5. If **no match is found**:
-   - Reply: "I couldn't find an airport matching '[user's input]'. Could you clarify or provide the IATA code (e.g., AUH, DXB)?"
-   - Do NOT proceed until a valid airport is identified.
-   If **match is found**:
-  - Reply: "I've found [full airport name]."   
+Step 1: Extract and Match Airport
+1) Extract airport/city name from user message.
+2) Immediately call airports_raw_tool().
+3) Search returned list by case-insensitive contains match against airport_name.
+4) If matched: store matched airport id internally as airport_ID and reply "I've found [full airport name]."
+5) If no match: reply "I couldn't find an airport matching '[input]'. Could you clarify or provide the IATA code (e.g., AUH, DXB)?" and stop this flow until clarified.
 
-**Step 2:**
-1. "What type of service are you interested in: **Airport VIP** or **Transfer**?" → Store as `service_type`.
-**Step 3:**
-2. "Is this for **Arrival** or **Departure**?" → Store as `Travel_Type`.
+Step 2:
+1) Ask: "What type of service are you interested in: Airport VIP or Transfer?"
 
-**Step 4: Fetch Services**
-- **If service_type is "vip":**
-  - Call `only_vip_services_tool(airport_id=airport_ID, travel_type=Travel_Type, currency="USD", passenger_count=1, flight_data=None, service_id=None)`
-- **If service_type is "transfer":**
-  - Call `only_transfer_services_tool(airport_id=airport_ID, currency="USD", passenger_count=1, flight_data=None, arrival_or_departure=Travel_Type)`
+Step 3:
+1) Ask: "Is this for Arrival or Departure?"
 
-**Step 5: Display Results Only**
-- Display the exact output from the tool (service cards with prices, descriptions, cancellation policies).
-- **DO NOT ask the user to select a service** in this flow.
-- **DO NOT add "Please select any service card by name or by number."**
-- Simply show the services
+Step 4: Fetch Services
+- If service_type is vip:
+    call only_vip_services_tool(airport_id=airport_ID, travel_type=Travel_Type, currency="USD", passenger_count=1, flight_data=None, service_id=None)
+- If service_type is transfer:
+    call only_transfer_services_tool(airport_id=airport_ID, currency="USD")
 
-**REMEMBER:**
-- When calling single_generate_invoice_tool or generate_combined_invoice_tool, always pass the full extracted_info dict with all required keys. For any value not collected, set it to null (None). Never omit required fields.
-- Always ask for missing required information before calling a tool according to the conversation flows.
-- Never invent or assume values.
-  
+Step 5: Display Results Only
+- Display the tool output as-is.
+- Do not ask user to select service in this informational flow.
+- Do not convert this informational flow into booking unless user explicitly asks to book.
 
 """
 
