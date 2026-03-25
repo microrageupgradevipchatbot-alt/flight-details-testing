@@ -2,6 +2,7 @@ import streamlit as st
 import uuid
 from langchain_core.messages import AIMessage
 from flights import agent, logger
+import streamlit.components.v1 as components
 # ---------- Page config ----------
 st.set_page_config(
     page_title="UpgradeVIP Chatbot",
@@ -144,7 +145,7 @@ with st.container():
         avatar = "🧑" if role == "user" else "✈️"
         with st.chat_message(role, avatar=avatar):
             if role == "assistant":
-                st.markdown(md_with_linebreaks(str(content)))
+                st.markdown(md_with_linebreaks(str(content)), unsafe_allow_html=True)
             else:
                 st.write(content)
 
@@ -159,6 +160,82 @@ if prompt:
     with st.chat_message("assistant", avatar="✈️"):
         with st.spinner("Processing..."):
             reply = call_agent(prompt)
-        st.markdown(md_with_linebreaks(reply))
+        st.markdown(md_with_linebreaks(reply), unsafe_allow_html=True)
 
     st.session_state.chat.append(("assistant", reply))
+
+# ---------- Floating Contact Buttons ----------
+st.markdown("""
+<style>
+.floating-buttons {
+    position: fixed;
+    bottom: 140px;
+    right: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    z-index: 9999;
+}
+
+.floating-buttons a {
+    text-decoration: none;
+}
+
+.floating-btn {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(145deg, #25D366 60%, #1ebe57 100%);
+    color: white;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25), 0 1.5px 4px rgba(0,0,0,0.18);
+    border: 2px solid #fff;
+    transition: box-shadow 0.2s, filter 0.2s;
+    padding: 0;
+    word-break: break-word;
+    cursor: pointer;
+    user-select: none;
+}
+
+.floating-btn.live-btn {
+    background: linear-gradient(145deg, #007bff 60%, #0056b3 100%);
+}
+
+.floating-btn:hover {
+    box-shadow: 0 10px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.22);
+    filter: brightness(1.08);
+}
+</style>
+<div class="floating-buttons">
+    <a href="https://wa.me/447414246103" target="_blank">
+        <div class="floating-btn">WhatsApp</div>
+    </a>
+    <a href="#" onclick="Tawk_API.maximize(); return false;">
+    <div class="floating-btn live-btn">Live Agent</div>
+</a>
+</div>
+""", unsafe_allow_html=True)
+
+
+
+components.html("""
+<!--Start of Tawk.to Script-->
+<script type="text/javascript">
+var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
+(function(){
+var s1=document.createElement("script"),
+s0=document.getElementsByTagName("script")[0];
+s1.async=true;
+s1.src='https://embed.tawk.to/69c3da4935e8d61c3a87571f/1jkigpbv8';
+s1.charset='UTF-8';
+s1.setAttribute('crossorigin','*');
+s0.parentNode.insertBefore(s1,s0);
+})();
+</script>
+<!--End of Tawk.to Script-->
+""", height=0)
