@@ -29,10 +29,10 @@ from langgraph.prebuilt import create_react_agent
 
 
 #============================================== .env  =========================================================
-load_dotenv()
-# GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+# load_dotenv()
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 def setup_paths():
     current_dir = Path(__file__).parent
     data_dir = current_dir / "DATA"
@@ -71,18 +71,18 @@ if  GOOGLE_API_KEY:
 else:
     logger.info("GOOGLE_API_KEY not found. Please set it in your environment or .env file.")
 
-# if not st.secrets.get("DEV_URL"):  
-#     logger.warning("DEV_URL not found. Please set it in your environment or .env file.")
-# if not st.secrets.get("API_KEY"):  
-#     logger.warning("API_KEY not found. Please set it in your environment or .env file.")  
-# dev_url = st.secrets.get("DEV_URL")
-# api_key = st.secrets.get("API_KEY")
-if not os.getenv("DEV_URL"):  
+if not st.secrets.get("DEV_URL"):  
     logger.warning("DEV_URL not found. Please set it in your environment or .env file.")
-if not os.getenv("API_KEY"):  
+if not st.secrets.get("API_KEY"):  
     logger.warning("API_KEY not found. Please set it in your environment or .env file.")  
-dev_url = os.getenv("DEV_URL")
-api_key = os.getenv("API_KEY")
+dev_url = st.secrets.get("DEV_URL")
+api_key = st.secrets.get("API_KEY")
+# if not os.getenv("DEV_URL"):  
+#     logger.warning("DEV_URL not found. Please set it in your environment or .env file.")
+# if not os.getenv("API_KEY"):  
+#     logger.warning("API_KEY not found. Please set it in your environment or .env file.")  
+# dev_url = os.getenv("DEV_URL")
+# api_key = os.getenv("API_KEY")
 #===============================================Flight Functions================================================================
 
 def get_flight_details_from_api(flight_number: str, flight_date: str) -> dict:
@@ -282,6 +282,13 @@ def build_dynamic_invoice_html(title: str, bookings: List[Dict[str, Any]], email
         service_currency = selected.get("currency") or booking.get("preferred_currency") or booking.get("currency") or "USD"
 
         raw_price = selected.get("price", booking.get("price", 0))
+        if isinstance(raw_price, str):
+            raw_price = (
+                raw_price.replace("$", "")
+                        .replace("€", "")
+                        .replace("£", "")
+                        .strip()
+            )
         try:
             price = float(raw_price)
         except (TypeError, ValueError):
@@ -314,13 +321,13 @@ def build_dynamic_invoice_html(title: str, bookings: List[Dict[str, Any]], email
             sections.append(f"<b>Message for Steward:</b> {booking.get('message_for_steward')}<br>")
         sections.append("<hr>")
 
-    sections.append("<h3>Total</h3>")
+    sections.append("<h3>BILL</h3>")
     if len(totals_by_currency) == 1:
         only_currency = list(totals_by_currency.keys())[0]
         symbol = currency_symbols.get(only_currency, "")
         sections.append(f"<b>Grand Total:</b> {symbol}{totals_by_currency[only_currency]:.2f} {only_currency}<br>")
     else:
-        sections.append("<b>Grand Total by Currency:</b><br>")
+        sections.append("<b>Services Charges:</b><br>")
         for cur, amount in totals_by_currency.items():
             symbol = currency_symbols.get(cur, "")
             sections.append(f"- {symbol}{amount:.2f} {cur}<br>")
@@ -423,14 +430,14 @@ def send_email(to_email, subject, message):
     logger.info(f"🚪 Inside send email function")
     
     # Replace with your SMTP server details
-    # smtp_server = st.secrets["SMTP_SERVER"]
-    # smtp_port = int(st.secrets["SMTP_PORT"])
-    # smtp_user = st.secrets["SMTP_USER"]
-    # smtp_pass = st.secrets["SMTP_PASS"]
-    smtp_server = os.getenv("SMTP_SERVER")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
+    smtp_server = st.secrets["SMTP_SERVER"]
+    smtp_port = int(st.secrets["SMTP_PORT"])
+    smtp_user = st.secrets["SMTP_USER"]
+    smtp_pass = st.secrets["SMTP_PASS"]
+    # smtp_server = os.getenv("SMTP_SERVER")
+    # smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    # smtp_user = os.getenv("SMTP_USER")
+    # smtp_pass = os.getenv("SMTP_PASS")
     msg = MIMEText(message,'html')
     msg["Subject"] = subject
     msg["From"] = smtp_user
@@ -734,6 +741,7 @@ def rag_query_tool(query: str, chat_history: Optional[List[Dict[str, str]]] = No
 @tool
 def build_dynamic_invoice_html_tool(title: str, bookings: List[Dict[str, Any]], email: str) -> str:
     """Generate a single combined invoice for any number of bookings."""
+    logger.info(f"🚪 Inside build_dynamic_invoice_html_tool with title: {title}, \n email: {email}, bookings count: {len(bookings)}, bookings: {bookings}")
     return build_dynamic_invoice_html(title, bookings, email)
 
 
@@ -849,6 +857,20 @@ def checkout_and_send_invoice_tool(title: str, bookings: List[Dict[str, Any]], e
     Build invoice and send email in one atomic tool call.
     This avoids passing large HTML payload between separate tool calls.
     """
+    import json
+
+    if isinstance(bookings, str):
+        try:
+            bookings = json.loads(bookings)
+        except Exception:
+            return {"ok": False, "message": "Invalid bookings format.", "email_sent": False}
+
+    if not isinstance(bookings, list) or not all(isinstance(b, dict) for b in bookings):
+        return {"ok": False, "message": "Bookings must be a list of objects.", "email_sent": False}
+
+    if not isinstance(email, str) or not email.strip():
+        return {"ok": False, "message": "Email is missing.", "email_sent": False}
+
     if not bookings:
         return {"ok": False, "message": "No bookings found.", "email_sent": False}
 
@@ -955,11 +977,11 @@ SYSTEM_PROMPT = """
 **ROLE:**
 Booking assistant for Airport VIP and Airport Transfer.
 
-**SMART FIELD REUSE (IMPORTANT):**
-- Extract any booking fields already provided by user in the same or previous messages (service type, flight number, flight date, arrival/departure, passengers, luggage, currency, etc.) and store them in extracted_info.current_booking.
-- Ask only missing fields.
-- Never re-ask a field that already has a valid value unless the user asks to change it.
-- Example: if user says "book vip, flight date is 10/03/2026", do not ask for flight date again; ask next missing field (like flight number).
+**SMART FIELD REUSE (STRICT):**
+- Reuse fields only inside current_booking.
+- New service means new current_booking (all fields empty).
+- Do not carry flight_number or flight_date from a previous booking.
+- Reuse old values only if user explicitly says "same as previous".
 
 **MANDATORY GATE:**
 - When booking intent is detected, always ask:
@@ -985,7 +1007,7 @@ STATE (use this shape in extracted_info):
         "preferred_currency": null,
         "selected_service": {
             "name": null,
-            "price": null,
+            "price": null, # keep only number, no currency symbols
             "currency": null,
             "description": null,
             "refund_policy": null
@@ -997,40 +1019,41 @@ STATE (use this shape in extracted_info):
 }
 
 **BOOKING FLOW (LOOP):**
-1) Ask service type (vip/transfer) only if missing.
-2) Ask flight number (LY001, BA111) only if missing.
-3) Ask flight date (MM/DD/YYYY) only if missing.
-4) Call flight_details_tool, then call format_flight_choice_tool and return its output exactly as-is (no rewrite, no summary, no extra text).
-5) Ask Arrival or Departure only if missing.
-6) Ask passenger count (1-10) only if missing.
-7) Ask luggage count (1-10) only if missing.
-8) Ask currency (USD/EUR/GBP) only if missing.
-9) Fetch services:
+1) Ask service type (vip/transfer) .
+2) Ask flight number (LY001, BA111) .
+3) Ask flight date (MM/DD/YYYY) .
+4) Call flight_details_tool,
+4a) Then immediately Call format_flight_choice_tool and return its output exactly as-is (no rewrite, no summary, no extra text).
+5) Ask Arrival or Departure .
+6) ask flight class (1st class, business, economy/plus)
+7) Ask passenger count (1-10) .
+8) Ask luggage count (1-10) .
+9) Ask currency (USD/EUR/GBP) .
+10) Fetch services:
      - vip: only_vip_services_tool(airport_id, travel_type, currency, passenger_count)
      - transfer: only_transfer_services_tool(airport_id, currency)
      airport_id from flight_details:
      - Departure -> origin_airport
      - Arrival -> destination_airport
     - Return the selected tool output exactly as-is (no paraphrase or reformat).
-10) Ask service selection by name or number, then map to selected_service with name/price/currency/description/refund_policy.
-11) Ask message for steward.
-12) Ask preferred meeting time.
-13) If transfer, ask address. If vip, skip address.
-14) Append current_booking to bookings.
-15) Ask: "Do you want to add another service? (yes/no)"
+11) Ask service selection by name or number, then map to selected_service with name/price/currency/description/refund_policy.
+12) Ask message for steward.
+13) Ask preferred meeting time.
+14) If transfer, ask address. If vip, skip address.
+15) Append current_booking to bookings.
+16) Ask: "Do you want to add another service? (yes/no)"
         - yes: reset current_booking and repeat flow.
         - no: proceed checkout.
 
 **CHECKOUT:**
 1) Ask email once if missing.
-2) Show brief summary of all bookings.
-3) Ask: "Is this correct? (yes/no)"
+2) Call build_dynamic_invoice_html_tool("UpgradeVIP", bookings, email) and show its output.
+3) Then ask: "Is this correct? (yes/no)"
 4) If yes:
-     - ask: "Please confirm (yes/no)."
-    - if yes: call checkout_and_send_invoice_tool("UpgradeVIP", bookings, email)
-    - if tool result ok=true: confirm email sent successfully
-    - if tool result ok=false: apologize and ask user to retry or update email
-     - if no: ask what to change and continue
+   - Call checkout_and_send_invoice_tool("UpgradeVIP", bookings, email)
+   - if tool result ok=true: confirm email sent successfully
+   - if tool result ok=false: apologize and ask user to retry or update email
+5) If no: ask what to change and continue.
 
 **RULES:**
 - Never invent values.
