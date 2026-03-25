@@ -215,7 +215,7 @@ st.markdown("""
     <a href="https://wa.me/447414246103" target="_blank">
         <div class="floating-btn">WhatsApp</div>
     </a>
-    <a href="#" onclick="Tawk_API.maximize(); return false;">
+    onclick="window.Tawk_API && Tawk_API.maximize(); return false;"
     <div class="floating-btn live-btn">Live Agent</div>
 </a>
 </div>
