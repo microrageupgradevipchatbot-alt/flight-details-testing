@@ -215,18 +215,18 @@ st.markdown("""
     <a href="https://wa.me/447414246103" target="_blank">
         <div class="floating-btn">WhatsApp</div>
     </a>
-    <a href="#">
+    <a href="#" onclick="window.Tawk_API && window.Tawk_API.maximize(); return false;">
     <div class="floating-btn live-btn">Live Agent</div>
 </a>
 </div>
 """, unsafe_allow_html=True)
 
-
 components.html("""
+<!--Start of Tawk.to Script-->
 <script type="text/javascript">
 var Tawk_API=Tawk_API||{};
-Tawk_API.onLoad = function(){
-    window.parent.Tawk_API = Tawk_API;
+Tawk_API.onLoad = function() {
+    window.parent.Tawk_API = Tawk_API;  // 👈 THIS IS THE FIX
 };
 
 (function(){
@@ -239,4 +239,5 @@ s1.setAttribute('crossorigin','*');
 s0.parentNode.insertBefore(s1,s0);
 })();
 </script>
+<!--End of Tawk.to Script-->
 """, height=0)
