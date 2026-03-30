@@ -1,7 +1,7 @@
 import streamlit as st
 import uuid
 from langchain_core.messages import AIMessage
-from flights import agent, logger
+from flights_v2 import agent, logger
 import streamlit.components.v1 as components
 # ---------- Page config ----------
 st.set_page_config(
@@ -165,79 +165,43 @@ if prompt:
     st.session_state.chat.append(("assistant", reply))
 
 # ---------- Floating Contact Buttons ----------
+# ---------- Reposition Zoho Widget to WhatsApp button position ----------
 st.markdown("""
 <style>
-.floating-buttons {
-    position: fixed;
-    bottom: 140px;
-    right: 30px;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-    z-index: 9999;
+/* Let Zoho sit in its natural bottom-right position */
+#zsiq_float {
+    bottom: 2px !important;
+    right: 20px !important;
 }
 
-.floating-buttons a {
-    text-decoration: none;
-}
-
-.floating-btn {
-    width: 70px;
-    height: 70px;
-    background: linear-gradient(145deg, #25D366 60%, #1ebe57 100%);
-    color: white;
-    border-radius: 50%;
-    font-size: 14px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.25), 0 1.5px 4px rgba(0,0,0,0.18);
-    border: 2px solid #fff;
-    transition: box-shadow 0.2s, filter 0.2s;
-    padding: 0;
-    word-break: break-word;
-    cursor: pointer;
-    user-select: none;
-}
-
-.floating-btn.live-btn {
-    background: linear-gradient(145deg, #007bff 60%, #0056b3 100%);
-}
-
-.floating-btn:hover {
-    box-shadow: 0 10px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.22);
-    filter: brightness(1.08);
+/* Lower Streamlit header z-index so Zoho sits on top */
+header[data-testid="stHeader"] {
+    z-index: 99 !important;
 }
 </style>
-<div class="floating-buttons">
-    <a href="https://wa.me/447414246103" target="_blank">
-        <div class="floating-btn">WhatsApp</div>
-    </a>
-    <a href="https://tawk.to/chat/69c3da4935e8d61c3a87571f/1jkigpbv8" target="_blank">
-    <div class="floating-btn live-btn">Live Agent</div>
-</a>
-</div>
 """, unsafe_allow_html=True)
 
 components.html("""
-<!--Start of Tawk.to Script-->
-<script type="text/javascript">
-var Tawk_API=Tawk_API||{};
-Tawk_API.onLoad = function() {
-    window.parent.Tawk_API = Tawk_API;  // 👈 THIS IS THE FIX
-};
+<script>
+// Inject Zoho SalesIQ into the PARENT window, not this sandboxed iframe
+(function() {
+    var parentWin = window.parent;
+    var parentDoc = window.parent.document;
 
-(function(){
-var s1=document.createElement("script"),
-s0=document.getElementsByTagName("script")[0];
-s1.async=true;
-s1.src='https://embed.tawk.to/69c3da4935e8d61c3a87571f/1jkigpbv8';
-s1.charset='UTF-8';
-s1.setAttribute('crossorigin','*');
-s0.parentNode.insertBefore(s1,s0);
+    // Set up $zoho on the parent window
+    parentWin.$zoho = parentWin.$zoho || {};
+    parentWin.$zoho.salesiq = parentWin.$zoho.salesiq || { ready: function() {} };
+
+    // Avoid loading the script twice on rerenders
+    if (parentDoc.getElementById('zsiqscript')) return;
+
+    var s = parentDoc.createElement('script');
+    s.id = 'zsiqscript';
+    s.src = 'https://salesiq.zohopublic.eu/widget?wc=siq552751ad3d53c7f4e550858402fbb836e2518285f7b29b84764f1d2ecdd12f29';
+    s.charset = 'UTF-8';
+    s.setAttribute('crossorigin', '*');
+    s.async = true;
+    parentDoc.body.appendChild(s);
 })();
 </script>
-<!--End of Tawk.to Script-->
 """, height=0)
