@@ -1,7 +1,7 @@
 import streamlit as st
 import uuid
 from langchain_core.messages import AIMessage
-from flights_v2 import agent, logger
+from flights import agent, logger
 import streamlit.components.v1 as components
 # ---------- Page config ----------
 st.set_page_config(
